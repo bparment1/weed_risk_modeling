@@ -123,12 +123,7 @@ View(data)
 #data=read.csv(file="firstmodelwithnewformatting.csv")
 head(data)
 y_var <- "invasion.status"
-#logitmodel <- glm(invasion.status ~es1+es2+es3+es4+es5+es6+es7
-#                  +es8+es9+es10+es11+es12+es13+es14+es15+es16+
-#                    es17+es18+es19+es20+es21+es22+es23+
-#                    impg1+impg2+impn1+impn2+impn3+impn4+impn5+impn6+
-#                    impa1+impa2+impa3+impa4+impp1+impp2+impp3+impp4+
-#                    impp5+impp6, family="binomial", data=data)
+
 explanatory_variables <- names(data)[-1]
 
 right_side_formula <- paste(explanatory_variables,collapse = " + ")
@@ -149,6 +144,33 @@ plot(rocd2)
 
 ##### Add code for training and testing
 
+#This function creates testing and training list for input sation data based on a list of dates. 
+#This function works for montly time scale if dates are provided as mid-months or other forms of for monthly records.
+#It requires 6 inputs:                                           
+# 1) seed_number: allow comparison across runs, if seed zero then no seed number is used
+# 2) nb_sample: number of time random sampling must be repeated for every hold out proportion 
+# 3) step : step for proportion range 
+# 4) constant: if value 1 then use the same samples as date one for the all set of dates
+# 5) prop_minmax: if prop_min=prop_max and step=0 then predicitons are done for the number of dates...
+# 6) dates: list of dates for prediction and subsetting                              
+# 7) ghcn: station data as data.frame -daily input                                                                                
+# 11) out_prefix: output suffix added to output names--it is the same in the interpolation script
+#
+#The output is a list of four shapefile names produced by the function:
+# 1) sampling_dat: sampling information for every run by date and sampling combintation
+# 2) sampling_index: list of indexes for training and testing for every dates
+# 3) sampling_stat_id: list of station ID for training and testing for every dates
+# 4) ghcn_data: ghcn subsets by date, can be monthly or daily with mulitple sampling
+
+seed_number <-list_param_sampling$seed_number
+nb_sample <- list_param_sampling$nb_sample
+step<-list_param_sampling$step #if seed zero then no seed?     
+constant <- list_param_sampling$constant
+prop_minmax<-list_param_sampling$prop_minmax
+dates<-list_param_sampling$dates
+#ghcn_name<-list_param_sampling$ghcn_name
+ghcn<-list_param_sampling$ghcn #can be daily or monthly!!
+#ghcn<-get(ghcn_name) 
 
 
 ################################ END OF SCRIPT ###################
