@@ -1,14 +1,14 @@
 ############### SESYNC Research Support: weed risk ########## 
-## Performing PCA on genes at SESYNC.
+## Performing ROC on data for model assessment.
 ## 
 ## DATE CREATED: 06/15/2017
-## DATE MODIFIED: 06/15/2017
+## DATE MODIFIED: 06/23/2017
 ## AUTHORS: Benoit Parmentier 
 ## PROJECT: weed risk Chinchu Harris
 ## ISSUE: 
 ## TO DO:
 ##
-## COMMIT: initial commit ROC testing
+## COMMIT:ROC testing on publicly available data
 ##
 ## Links to investigate:
 
@@ -37,7 +37,12 @@ library(dplyr)
 library(ROCR)
 library(pROC)
 library(TOC)
+library(randomForest) #for random forests
+library(lattice)
+library(caret) #for CV folds and data splitting
+library(gplots)
 
+#
 ###### Functions used in this script and sourced from other files
 
 create_dir_fun <- function(outDir,out_suffix=NULL){
@@ -75,9 +80,9 @@ out_dir <- "/nfs/bparmentier-data/Data/projects/modeling_weed_risk/outputs" #par
 num_cores <- 2 #param 8
 create_out_dir_param=TRUE # param 9
 
-out_suffix <-"roc_experiment_06152017" #output suffix for the files and ouptut folder #param 12
+out_suffix <-"roc_experiment_06232017" #output suffix for the files and ouptut folder #param 12
 
-#infile_genes_ncis <- "genes_ncis.csv"
+infile_data <- "publicavailableaphisdatsetforbenoit.csv"
 #infile_genes_identity <- "genes_identity.csv"
 
 ##############################  START SCRIPT  ############################
@@ -99,33 +104,51 @@ if(create_out_dir_param==TRUE){
 }
 
 options(scipen=999)
+
+
 ### PART I READ AND PREPARE DATA #######
 #set up the working directory
 #Create output directory
 
-mydata <- read.csv("https://stats.idre.ucla.edu/stat/data/binary.csv")
-## view the first few rows of the data
-head(mydata)
+data <- read.csv(file.path(in_dir,infile_data))
+dim(data)
+View(data)
+#> dim(data)
+#[1] 94 42
 
+###### SET UP EQUATION AND MODEL PREDICIONS #####
 
-## two-way contingency table of categorical outcome and predictors we want
-## to make sure there are not 0 cells
-xtabs(~admit + rank, data = mydata)
+#NON=non invader=0 #OTH=major invader + minor invader=1
+#67 instances of 0 #136 instances of 1
+#data=read.csv(file="firstmodelwithnewformatting.csv")
+head(data)
+y_var <- "invasion.status"
+#logitmodel <- glm(invasion.status ~es1+es2+es3+es4+es5+es6+es7
+#                  +es8+es9+es10+es11+es12+es13+es14+es15+es16+
+#                    es17+es18+es19+es20+es21+es22+es23+
+#                    impg1+impg2+impn1+impn2+impn3+impn4+impn5+impn6+
+#                    impa1+impa2+impa3+impa4+impp1+impp2+impp3+impp4+
+#                    impp5+impp6, family="binomial", data=data)
+explanatory_variables <- names(data)[-1]
 
-mydata$rank <- factor(mydata$rank)
-mylogit <- glm(admit ~ gre + gpa + rank, data = mydata, family = "binomial")
+right_side_formula <- paste(explanatory_variables,collapse = " + ")
+model_formula_str <- paste0(y_var," ~ ",right_side_formula,sep="")
 
-mylogit$fitted.values
+mod <- glm(model_formula_str,data = data)
 
-### Do ROC now
+mod$fitted.values
+data[,y_var]
+table(data[,y_var])
 
-mydata$admit
-table(mydata$admit)
+mask_val <- 1:nrow(data)
+rocd2 <- ROC(index=mod$fitted.values, boolean=data[[y_var]], mask=mask_val, nthres = 100)
 
-mask_val <- 1:nrow(mydata)
-rocd <- ROC(index=mylogit$fitted.values, boolean=mydata$admit, mask=mask_val, nthres = 100)
+slot(rocd2,"AUC") #this is your AUC
+#Plot ROC curve:
+plot(rocd2)
 
-plot(rocd)
+##### Add code for training and testing
+
 
 
 ################################ END OF SCRIPT ###################
