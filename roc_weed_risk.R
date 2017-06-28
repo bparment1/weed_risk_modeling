@@ -2,7 +2,7 @@
 ## Performing ROC on data for model assessment.
 ## 
 ## DATE CREATED: 06/15/2017
-## DATE MODIFIED: 06/23/2017
+## DATE MODIFIED: 06/28/2017
 ## AUTHORS: Benoit Parmentier 
 ## PROJECT: weed risk Chinchu Harris
 ## ISSUE: 
@@ -67,9 +67,9 @@ load_obj <- function(f){
 
 ### Other functions ####
 
-#function_pca_eof <- "pca_eof_functions_06152017.R" #PARAM 1
-#script_path <- "/nfs/bparmentier-data/Data/projects/neighborhood_regression_spatial_demography/scripts" #path to script #PARAM 
-#source(file.path(script_path,function_pca_eof)) #source all functions used in this script 1.
+function_sampling <- "sampling_function_06282017.R" #PARAM 1
+script_path <- "/nfs/bparmentier-data/Data/projects/modeling_weed_risk/scripts" #path to script #PARAM 
+source(file.path(script_path,function_sampling)) #source all functions used in this script 1.
 
 ############################################################################
 ####################  Parameters and argument set up ###########
@@ -80,7 +80,7 @@ out_dir <- "/nfs/bparmentier-data/Data/projects/modeling_weed_risk/outputs" #par
 num_cores <- 2 #param 8
 create_out_dir_param=TRUE # param 9
 
-out_suffix <-"roc_experiment_06232017" #output suffix for the files and ouptut folder #param 12
+out_suffix <-"roc_experiment_06282017" #output suffix for the files and ouptut folder #param 12
 
 infile_data <- "publicavailableaphisdatsetforbenoit.csv"
 #infile_genes_identity <- "genes_identity.csv"
@@ -103,7 +103,7 @@ if(create_out_dir_param==TRUE){
   setwd(out_dir) #use previoulsy defined directory
 }
 
-options(scipen=999)
+options(scipen=999)  #remove scientific writing
 
 
 ### PART I READ AND PREPARE DATA #######
@@ -131,46 +131,28 @@ model_formula_str <- paste0(y_var," ~ ",right_side_formula,sep="")
 
 mod <- glm(model_formula_str,data = data)
 
-mod$fitted.values
+mod$fitted.values #these are the probability values from ROC
 data[,y_var]
 table(data[,y_var])
 
 mask_val <- 1:nrow(data)
 rocd2 <- ROC(index=mod$fitted.values, boolean=data[[y_var]], mask=mask_val, nthres = 100)
 
-slot(rocd2,"AUC") #this is your AUC
+slot(rocd2,"AUC") #this is your AUC from the logistic modeling
 #Plot ROC curve:
 plot(rocd2)
 
-##### Add code for training and testing
+seed_number <- 100
+nb_sample <- 10
+step <- 0.1
+prop_minmax <- c(0.3,0.5)
+out_suffix
+out_dir
 
-#This function creates testing and training list for input sation data based on a list of dates. 
-#This function works for montly time scale if dates are provided as mid-months or other forms of for monthly records.
-#It requires 6 inputs:                                           
-# 1) seed_number: allow comparison across runs, if seed zero then no seed number is used
-# 2) nb_sample: number of time random sampling must be repeated for every hold out proportion 
-# 3) step : step for proportion range 
-# 4) constant: if value 1 then use the same samples as date one for the all set of dates
-# 5) prop_minmax: if prop_min=prop_max and step=0 then predicitons are done for the number of dates...
-# 6) dates: list of dates for prediction and subsetting                              
-# 7) ghcn: station data as data.frame -daily input                                                                                
-# 11) out_prefix: output suffix added to output names--it is the same in the interpolation script
-#
-#The output is a list of four shapefile names produced by the function:
-# 1) sampling_dat: sampling information for every run by date and sampling combintation
-# 2) sampling_index: list of indexes for training and testing for every dates
-# 3) sampling_stat_id: list of station ID for training and testing for every dates
-# 4) ghcn_data: ghcn subsets by date, can be monthly or daily with mulitple sampling
-
-seed_number <-list_param_sampling$seed_number
-nb_sample <- list_param_sampling$nb_sample
-step<-list_param_sampling$step #if seed zero then no seed?     
-constant <- list_param_sampling$constant
-prop_minmax<-list_param_sampling$prop_minmax
-dates<-list_param_sampling$dates
-#ghcn_name<-list_param_sampling$ghcn_name
-ghcn<-list_param_sampling$ghcn #can be daily or monthly!!
-#ghcn<-get(ghcn_name) 
-
+#sampling_training_testing(seed_number,nb_sample,step,prop_minmax,data_df,out_suffix,out_dir)
+sampled_data_obj <- sampling_training_testing(data_df,nb_sample,step,prop_minmax,obs_id=NULL,seed_number=100,out_suffix="",out_dir=".")
+sampled_data_obj$sampling_dat #sampling run summary data.frame with ID and settings
+sampled_data_obj$data_training[[1]] # testing df for run sample ID 1
+sampled_data_obj$data_testing[[1]]  # training df for run sampling 2
 
 ################################ END OF SCRIPT ###################
