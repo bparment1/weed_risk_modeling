@@ -52,7 +52,12 @@ run_model_fun <- function(data_df,model_formula_str,model_opt,data_testing=NULL,
   #out_suffix
   
   if(model_opt=="logistic"){
-    mod <- glm(model_formula_str,data = data_df) #this is the training data!!
+    if(class(data_df)!="list"){
+      mod <- glm(model_formula_str,data = data_df) #this is the training data!!
+    }else
+      mclapply(,
+               )
+    
   }
   
   ### add randomForest option
@@ -77,8 +82,8 @@ run_model_fun <- function(data_df,model_formula_str,model_opt,data_testing=NULL,
         width=col_mfrow*res_pix,height=row_mfrow*res_pix)
     par(mfrow=c(row_mfrow,col_mfrow))
     
-    mask_val <- 1:nrow(data)
-    rocd2 <- ROC(index=mod$fitted.values, boolean=data[[y_var]], mask=mask_val, nthres = 100)
+    mask_val <- 1:nrow(data_df)
+    rocd2 <- ROC(index=mod$fitted.values, boolean=data_df[[y_var]], mask=mask_val, nthres = 100)
     
     slot(rocd2,"AUC") #this is your AUC from the logistic modeling
     #Plot ROC curve:
