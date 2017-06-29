@@ -68,7 +68,7 @@ load_obj <- function(f){
 ### Other functions ####
 
 function_sampling <- "sampling_function_06292017b.R" #PARAM 1
-function_modeling <- "roc_weed_risk_functions_06292017b.R" #PARAM 1
+function_modeling <- "roc_weed_risk_functions_06292017c.R" #PARAM 1
 
 script_path <- "/nfs/bparmentier-data/Data/projects/modeling_weed_risk/scripts" #path to script #PARAM 
 source(file.path(script_path,function_sampling)) #source all functions used in this script 1.
@@ -80,7 +80,7 @@ source(file.path(script_path,function_modeling)) #source all functions used in t
 in_dir <- "/nfs/bparmentier-data/Data/projects/modeling_weed_risk/data" #local bpy50 , param 1
 out_dir <- "/nfs/bparmentier-data/Data/projects/modeling_weed_risk/outputs" #param 2
 
-num_cores <- 2 #param 8
+num_cores <- 1 #param 8
 create_out_dir_param=TRUE # param 9
 
 out_suffix <-"roc_experiment_06292017" #output suffix for the files and ouptut folder #param 12
@@ -130,8 +130,10 @@ y_var <- "invasion.status"
 explanatory_variables <- names(data)[-1]
 
 right_side_formula <- paste(explanatory_variables,collapse = " + ")
-model_formula_str <- paste0(y_var," ~ ",right_side_formula,sep="")
+model_formula_str <- paste0(y_var," ~ ",right_side_formula)
 
+#Check the option binomial effect on predictions
+mod <- glm(model_formula_str,data = data,family=binomial())
 mod <- glm(model_formula_str,data = data)
 
 mod$fitted.values #these are the probability values from ROC
@@ -166,7 +168,8 @@ png(filename=file.path(out_dir,png_file_name),
 par(mfrow=c(row_mfrow,col_mfrow))
 
 mask_val <- 1:nrow(data)
-rocd2 <- ROC(index=mod$fitted.values, boolean=data[[y_var]], mask=mask_val, nthres = 100)
+rocd2 <- ROC(index=mod$fitted.values, 
+             boolean=data[[y_var]], mask=mask_val, nthres = 100)
 
 slot(rocd2,"AUC") #this is your AUC from the logistic modeling
 #Plot ROC curve:
@@ -188,27 +191,54 @@ out_dir
 #sampling_training_testing(seed_number,nb_sample,step,prop_minmax,data_df,out_suffix,out_dir)
 #debug(sampling_training_testing)
 sampled_data_obj <- sampling_training_testing(data,nb_sample,step,prop_minmax,obs_id=NULL,seed_number=100,out_suffix="",out_dir=".")
+
+names(sampled_data_obj)
+
 sampled_data_obj$sampling_dat #sampling run summary data.frame with ID and settings
+length(sampled_data_obj$data_training)
 sampled_data_obj$data_training[[1]] # testing df for run sample ID 1
 sampled_data_obj$data_testing[[1]]  # training df for run sampling 2
 
 list_data_training <- sampled_data_obj$data_training
 list_data_testing <- sampled_data_obj$data_testing
 
-paste(data_v)
-names()
+#paste(data_v)
+#names()
 ###### Can repeat the logistic model for each sample of training!!!
-lf <- run_model_fun(data_df=data,model_formula_str = model_formula_str,model_opt="logistic",data_testing=NULL,save_fig=T,out_dir=".",out_suffix="")
+#lf <- run_model_fun(data_df=data,model_formula_str = model_formula_str,model_opt="logistic",data_testing=NULL,save_fig=T,out_dir=".",out_suffix="")
+#lf <- run_model_fun(data_df=data,model_formula_str = model_formula_str,model_opt="logistic",data_testing=NULL,save_fig=T,out_dir=".",out_suffix="")
 
 
-lf <- run_model_fun(data_df=data,model_formula_str = model_formula_str,model_opt="logistic",data_testing=NULL,save_fig=T,out_dir=".",out_suffix="")
+test <- run_model_fun(data_df=list_data_training,
+                      model_formula_str = model_formula_str,
+                      model_opt="logistic",
+                      data_testing=list_data_testing,
+                      num_cores=1,
+                      out_dir=".",
+                      out_suffix="")
+list_predicted_val <- test$predicted_val
 
+#rep(data===)
+names(list_data_testing) <- paste0("data_testing_",1:length(list_data_testing)) 
+#debug(ROC_evaluation_fun)
 
-run_model_fun(data_df=list_data_training,model_formula_str = model_formula_str,model_opt="logistic",data_testing=list_data_testing,num_cores=1,out_dir=".",out_suffix="")
+roc_obj <- ROC_evaluation_fun(i=1,
+                   list_data=list_data_testing,
+                   y_var=y_var,
+                   predicted_val=list_predicted_val,
+                   save_fig=T,
+                   out_suffix=out_suffix,
+                   out_dir=out_dir)
+  
+list_roc_obj <- lapply(1:length(list_predicted_val),
+                       FUN=ROC_evaluation_fun,
+                       list_data=list_data_testing,
+                       y_var=y_var,
+                       predicted_val=list_predicted_val,
+                       save_fig=T,
+                       out_suffix=out_suffix,
+                       out_dir=out_dir)
 
-
-#mclapply()
-
-
+list_roc_obj[[2]]
 
 ################################ END OF SCRIPT ###################
