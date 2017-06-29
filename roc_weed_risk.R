@@ -67,8 +67,8 @@ load_obj <- function(f){
 
 ### Other functions ####
 
-function_sampling <- "sampling_function_06292017.R" #PARAM 1
-function_modeling <- "roc_weed_risk_functions_06292017.R" #PARAM 1
+function_sampling <- "sampling_function_06292017b.R" #PARAM 1
+function_modeling <- "roc_weed_risk_functions_06292017b.R" #PARAM 1
 
 script_path <- "/nfs/bparmentier-data/Data/projects/modeling_weed_risk/scripts" #path to script #PARAM 
 source(file.path(script_path,function_sampling)) #source all functions used in this script 1.
@@ -186,14 +186,25 @@ out_suffix
 out_dir
 
 #sampling_training_testing(seed_number,nb_sample,step,prop_minmax,data_df,out_suffix,out_dir)
-sampled_data_obj <- sampling_training_testing(data_df,nb_sample,step,prop_minmax,obs_id=NULL,seed_number=100,out_suffix="",out_dir=".")
+#debug(sampling_training_testing)
+sampled_data_obj <- sampling_training_testing(data,nb_sample,step,prop_minmax,obs_id=NULL,seed_number=100,out_suffix="",out_dir=".")
 sampled_data_obj$sampling_dat #sampling run summary data.frame with ID and settings
 sampled_data_obj$data_training[[1]] # testing df for run sample ID 1
 sampled_data_obj$data_testing[[1]]  # training df for run sampling 2
 
-list_data_training <- sampled_data_obj
+list_data_training <- sampled_data_obj$data_training
+list_data_testing <- sampled_data_obj$data_testing
+
+paste(data_v)
+names()
 ###### Can repeat the logistic model for each sample of training!!!
 lf <- run_model_fun(data_df=data,model_formula_str = model_formula_str,model_opt="logistic",data_testing=NULL,save_fig=T,out_dir=".",out_suffix="")
+
+
+lf <- run_model_fun(data_df=data,model_formula_str = model_formula_str,model_opt="logistic",data_testing=NULL,save_fig=T,out_dir=".",out_suffix="")
+
+
+run_model_fun(data_df=list_data_training,model_formula_str = model_formula_str,model_opt="logistic",data_testing=list_data_testing,num_cores=1,out_dir=".",out_suffix="")
 
 
 #mclapply()
