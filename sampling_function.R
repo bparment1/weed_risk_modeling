@@ -105,7 +105,7 @@ sampling_training_testing<-function(data_df,nb_sample,step,prop_minmax,obs_id=NU
   list_sampling_testing <- vector("list",sn)
   
   for(i in 1:sn){
-    n<-nrow(data_df)
+    n<- nrow(data_df)
     prop<-(sampling_dat$prop[i])/100
     
     ns<-n-round(n*prop)   #Create a sample from the data frame with 70% of the rows
@@ -118,7 +118,7 @@ sampling_training_testing<-function(data_df,nb_sample,step,prop_minmax,obs_id=NU
     
     #obs_id.training <- data_sampled$obs_id    #selected id for the randomly sampled stations (115)
     #Save the information
-    sampling[[i]] <- ind.training #index of training sample from data.frame
+    #sampling[[i]] <- ind.training #index of training sample from data.frame
     list_sampling_training[[i]] <- data_training
     list_sampling_testing[[i]] <- data_testing
     #sampling_station_id[[i]]<- station_id.training #station ID for traning samples
