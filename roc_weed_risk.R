@@ -68,8 +68,11 @@ load_obj <- function(f){
 ### Other functions ####
 
 function_sampling <- "sampling_function_06292017.R" #PARAM 1
+function_modeling <- "roc_weed_risk_functions_06292017.R" #PARAM 1
+
 script_path <- "/nfs/bparmentier-data/Data/projects/modeling_weed_risk/scripts" #path to script #PARAM 
 source(file.path(script_path,function_sampling)) #source all functions used in this script 1.
+source(file.path(script_path,function_modeling)) #source all functions used in this script 1.
 
 ############################################################################
 ####################  Parameters and argument set up ###########
@@ -80,7 +83,7 @@ out_dir <- "/nfs/bparmentier-data/Data/projects/modeling_weed_risk/outputs" #par
 num_cores <- 2 #param 8
 create_out_dir_param=TRUE # param 9
 
-out_suffix <-"roc_experiment_06282017" #output suffix for the files and ouptut folder #param 12
+out_suffix <-"roc_experiment_06292017" #output suffix for the files and ouptut folder #param 12
 
 infile_data <- "publicavailableaphisdatsetforbenoit.csv"
 #infile_genes_identity <- "genes_identity.csv"
@@ -142,7 +145,10 @@ slot(rocd2,"AUC") #this is your AUC from the logistic modeling
 #Plot ROC curve:
 plot(rocd2)
 
-
+names(rocd2)
+str(rocd2)
+#Access table: 
+roc_table <- slot(rocd2,"table")
 
 ### Save plot?
 
@@ -185,56 +191,11 @@ sampled_data_obj$sampling_dat #sampling run summary data.frame with ID and setti
 sampled_data_obj$data_training[[1]] # testing df for run sample ID 1
 sampled_data_obj$data_testing[[1]]  # training df for run sampling 2
 
+list_data_training <- sampled_data_obj
 ###### Can repeat the logistic model for each sample of training!!!
 lf <- run_model_fun(data_df=data,model_formula_str = model_formula_str,model_opt="logistic",data_testing=NULL,save_fig=T,out_dir=".",out_suffix="")
 
-run_model_fun <- function(data_df,model_formula_str,model_opt,data_testing=NULL,save_fig=F,out_dir=".",out_suffix=""){
-  #data_df: input data.frame with data used in modeling
-  #model_formula_str
-  #model_opt: "logistic","randomForest"
-  #out_dir
-  #out_suffix
-  
-  if(model_opt=="logistic"){
-    mod <- glm(model_formula_str,data = data_df) #this is the training data!!
-  }
-  
-  ### add randomForest option
-  
-  mod$fitted.values #these are the probability values from ROC
-  data_df[,y_var]
-  table(data_df[,y_var])
-  
 
-  if(save_fig==TRUE){
-    
-    out_suffix_str <- paste0("full_data_",out_suffix)
-      
-    res_pix<-480 #set as function argument...
-    col_mfrow<-1
-    #row_mfrow<-2
-    row_mfrow<-1
-    
-    png_file_name<- paste("Figure_","ROC_plot_",out_suffix_str,".png", sep="")
-    
-    png(filename=file.path(out_dir,png_file_name),
-        width=col_mfrow*res_pix,height=row_mfrow*res_pix)
-    par(mfrow=c(row_mfrow,col_mfrow))
-    
-    mask_val <- 1:nrow(data)
-    rocd2 <- ROC(index=mod$fitted.values, boolean=data[[y_var]], mask=mask_val, nthres = 100)
-    
-    slot(rocd2,"AUC") #this is your AUC from the logistic modeling
-    #Plot ROC curve:
-    plot(rocd2)
-    
-    dev.off()
-  }
-  
-  return(png_file_name)
-    
-}
-    
 #mclapply()
 
 
