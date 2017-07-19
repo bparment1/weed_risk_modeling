@@ -63,6 +63,7 @@ run_model_fun <- function(data_df,model_formula_str,model_opt,data_testing=NULL,
   }
 
   if(model_opt=="logistic"){
+    
     #
     #if(class(data_df)!="list"){
     #  list_mod <- glm(model_formula_str,data = data_df,family=binomial()) #this is the training data!!
@@ -98,7 +99,33 @@ run_model_fun <- function(data_df,model_formula_str,model_opt,data_testing=NULL,
   }
   
   ##if(model=="RF)##
-  
+  if(model_opt=="randomForest"){
+    list_rmod <- mclapply(1:length(data_df),
+                         FUN=function(i,model_formula_str,data_df){data_input<-data_df[[i]]; 
+                         rmod <-  randomForest(as.factor(y_var)~explanatory_variables, importance=T, proximity=F, ntree=1000, confusion=F, err.rate=F data=data_input);
+                         return(rmod)},
+                         model_formula_str=model_formula_str,
+                         data_df=data_df,
+                         mc.preschedule = FALSE,
+                         mc.cores =num_cores)
+    
+    if(!is.null(data_testing)){
+      #
+      list_predicted_val <- mclapply(1:length(data_df),
+                                     FUN=function(i,list_rmod,data_testing){data_v<-data_testing[[i]]; 
+                                     rmod <- list_rmod[[i]];
+                                     predicted_val <- predict(rmod,newdata=data_v,type='response');
+                                     return(predicted_val)},
+                                     list_rmod=list_rmod,
+                                     data_testing=data_testing,
+                                     mc.preschedule = FALSE,
+                                     mc.cores =num_cores)
+    } else{
+      list_predicted_val <- NULL
+    }
+    } 
+    
+  ################*bold bold *#####################
   model_obj <- list(list_mod,list_predicted_val,data_df,data_testing)
   names(model_obj) <- c("mod","predicted_val","data_training","data_testing")
   return(model_obj)
