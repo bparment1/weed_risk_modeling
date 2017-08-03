@@ -2,8 +2,8 @@
 ## Performing ROC on data for model assessment.
 ## 
 ## DATE CREATED: 06/15/2017
-## DATE MODIFIED: 06/29/2017
-## AUTHORS: Benoit Parmentier 
+## DATE MODIFIED: 08/03/2017
+## AUTHORS: Benoit Parmentier, Chinchu Harris 
 ## PROJECT: weed risk Chinchu Harris
 ## ISSUE: 
 ## TO DO:
@@ -68,22 +68,29 @@ load_obj <- function(f){
 ### Other functions ####
 
 function_sampling <- "sampling_function_06292017b.R" #PARAM 1
-function_modeling <- "roc_weed_risk_functions_06292017c.R" #PARAM 1
+function_modeling <- "CH07-26-2017roc_weed_risk_functions_06292017c.R" #PARAM 1 #changed this to another file
+#function_modeling <- "CH07-19-2017roc_weed_risk_functions_06292017c.R" #PARAM 1 #changed this to another file
 
-script_path <- "/nfs/bparmentier-data/Data/projects/modeling_weed_risk/scripts" #path to script #PARAM 
+#script_path <- "/Users/chinchuharris/modeling_weed_risk/scripts" #path to script #PARAM 
+script_path <- "/nfs/bparmentier-data/Data/projects/modeling_weed_risk/scripts"
+
 source(file.path(script_path,function_sampling)) #source all functions used in this script 1.
 source(file.path(script_path,function_modeling)) #source all functions used in this script 1.
 
 ############################################################################
 ####################  Parameters and argument set up ###########
 
-in_dir <- "/nfs/bparmentier-data/Data/projects/modeling_weed_risk/data" #local bpy50 , param 1
-out_dir <- "/nfs/bparmentier-data/Data/projects/modeling_weed_risk/outputs" #param 2
+in_dir <- "/nfs/bparmentier-data/Data/projects/modeling_weed_risk/data"
+out_dir <- "/nfs/bparmentier-data/Data/projects/modeling_weed_risk/outputs"
 
-num_cores <- 1 #param 8
+#Chinchu data
+#in_dir <- "/Users/chinchuharris/modeling_weed_risk/data" #local bpy50 , param 1
+#out_dir <- "/Users/chinchuharris/modeling_weed_risk/outputs" #param 2
+
+num_cores <- 2 #param 8 #normally I use only 1 core for this dataset but since I want to use the mclappy function the number of cores is changed to 2. If it was 1 then mclappy will be reverted back to the lapply function
 create_out_dir_param=TRUE # param 9
 
-out_suffix <-"roc_experiment_06292017" #output suffix for the files and ouptut folder #param 12
+out_suffix <-"roc_experiment_08032017" #output suffix for the files and ouptut folder #param 12
 
 infile_data <- "publicavailableaphisdatsetforbenoit.csv"
 #infile_genes_identity <- "genes_identity.csv"
@@ -125,6 +132,14 @@ View(data)
 #67 instances of 0 #136 instances of 1
 #data=read.csv(file="firstmodelwithnewformatting.csv")
 head(data)
+#datadf <- data.frame(data)
+#class(data$invasion.status)
+#y_var <- as.factor(data[,"invasion.status"])
+
+#data$invasion.status <- as.factor(data$invasion.status)
+#y_var <- data$invasion.status
+#explanatory_variables <- names(data)[-1]
+
 y_var <- "invasion.status"
 
 explanatory_variables <- names(data)[-1]
@@ -132,16 +147,120 @@ explanatory_variables <- names(data)[-1]
 right_side_formula <- paste(explanatory_variables,collapse = " + ")
 model_formula_str <- paste0(y_var," ~ ",right_side_formula)
 
+right_side_formula <- paste(explanatory_variables,collapse = " + ")
+model_formula_str <- paste0(y_var," ~ ",right_side_formula)
+#model_formula_str <- as.formula(paste(data$y_var, right_side_formula, sep = "~"))
 #Check the option binomial effect on predictions
-mod <- glm(model_formula_str,data = data,family=binomial())
-mod <- glm(model_formula_str,data = data)
+#mod <- glm(model_formula_str,data = data,family=binomial())
+#mod <- glm(model_formula_str,data = data)
 
-mod$fitted.values #these are the probability values from ROC
+######Random Forest model##################
+
+rf_output=randomForest(x=predictor_data, 
+                       y=target, 
+                       importance = TRUE, 
+                       ntree = 10001, 
+                       proximity=TRUE, 
+                       sampsize=sampsizes)
+
+
+modrf <- predict(mod, data=data, type="prob")
+
+
+mod=randomForest(x=data[,-1], 
+                       y=data[,1], 
+                       importance = TRUE, 
+                       ntree = 10001, 
+                       proximity=TRUE, 
+                       sampsize=42)
+mod=randomForest(x=data[,-1], 
+                 y=data[,1], 
+                 importance = TRUE, 
+                 ntree = 10001, 
+                 proximity=TRUE) 
+                 #sampsize=42)
+
+#This does not work:
+set.seed(100)
+mod2=randomForest(as.formula("invasion.status ~ . "),
+                 #type="classification",
+                 data=data,
+                 importance = TRUE, 
+                 ntree = 10001, 
+                 proximity=TRUE) 
+mod2=randomForest(as.formula(model_formula_str),
+                  #type="classification",
+                  data=data,
+                  importance = TRUE, 
+                  ntree = 10001, 
+                  proximity=TRUE) 
+
+iris_rf <- randomForest(Species~.,data=trainData,ntree=100,proximity=TRUE)
+
+
+mod <- randomForest(model_formula_str,
+                    importance=T,
+                    proximity=F,
+                    ntree=1000,
+                    type="prob",
+                    confusion=F,
+                    err.rate=F,
+                    data=data)
+
+modrf <- predict(mod, data=data, type="prob")
+
+data$invasion.status <- factor9
+data[[y_var]] <- as.factor(data[[y_var]])
+
+mod <- randomForest(formula=model_formula_str,
+                    #importance=T,
+                    #proximity=F,
+                    #ntree=1000,
+                    #confusion=F,
+                    #err.rate=F,
+                    data=data)
+
+mod <- randomForest("invasion.status ~.",
+                    importance=T,
+                    proximity=F,
+                    ntree=1000,
+                    confusion=F,
+                    err.rate=F,
+                    data=data)
+
+ind <- sample(2,nrow(iris),replace=TRUE,prob=c(0.7,0.3))
+trainData <- iris[ind==1,]
+testData <- iris[ind==2,]
+View(iris)
+#test<- predict(mod,data)
+
+rf_output=randomForest(x=predictor_data, y=target, 
+                       importance = TRUE, ntree = 10001, 
+                       proximity=TRUE, 
+                       sampsize=sampsizes)
+
+iris_rf <- randomForest(Species~.,data=trainData,ntree=100,proximity=TRUE)
+table(predict(iris_rf),trainData$Species)
+tt <- predict(iris_rf)
+tt
+mod
+class(y_var)
+#importance is set to True in order to assess the importance of the predictors (for downstream evaluations like variable importance plots)
+#proximity is set to False because we are not determining the distance of the observations to one another
+#confusion is set to False because we are using cross validation not OOB error rates to determine accuracy prediction
+#err.rate is set to False because we are using cross validation not OOB measures
+########Random Forest model end#############
+modrf <- predict(mod, data=data, type="prob")
+#mod$fitted.values #these are the probability values from ROC
 data[,y_var]
 table(data[,y_var])
 
 mask_val <- 1:nrow(data)
-rocd2 <- ROC(index=mod$fitted.values, boolean=data[[y_var]], mask=mask_val, nthres = 100)
+#rocd2 <- ROC(index=modrf, boolean=data[[y_var]], mask=mask_val, nthres=100)
+rocd2 <- ROC(index=modrf[,2], boolean=as.numeric(as.character(y_var)), mask=mask_val, nthres=100)
+
+#modrf[,1]
+#rocd2 <- ROC(index=mod$fitted.values, boolean=data[[y_var]], mask=mask_val, nthres = 100)
 
 slot(rocd2,"AUC") #this is your AUC from the logistic modeling
 #Plot ROC curve:
@@ -211,7 +330,7 @@ list_data_testing <- sampled_data_obj$data_testing
 
 test <- run_model_fun(data_df=list_data_training,
                       model_formula_str = model_formula_str,
-                      model_opt="logistic",
+                      model_opt="randomForest",
                       data_testing=list_data_testing,
                       num_cores=1,
                       out_dir=".",
@@ -223,13 +342,13 @@ names(list_data_testing) <- paste0("data_testing_",1:length(list_data_testing))
 #debug(ROC_evaluation_fun)
 
 roc_obj <- ROC_evaluation_fun(i=1,
-                   list_data=list_data_testing,
-                   y_var=y_var,
-                   predicted_val=list_predicted_val,
-                   save_fig=T,
-                   out_suffix=out_suffix,
-                   out_dir=out_dir)
-  
+                              list_data=list_data_testing,
+                              y_var=y_var,
+                              predicted_val=list_predicted_val,
+                              save_fig=T,
+                              out_suffix=out_suffix,
+                              out_dir=out_dir)
+
 list_roc_obj <- lapply(1:length(list_predicted_val),
                        FUN=ROC_evaluation_fun,
                        list_data=list_data_testing,
@@ -239,6 +358,10 @@ list_roc_obj <- lapply(1:length(list_predicted_val),
                        out_suffix=out_suffix,
                        out_dir=out_dir)
 
-list_roc_obj[[2]]
-
+list_roc_obj[[2]] #gives ROC table values and overall ROC AUC value
+list_roc_obj[[1]]
+list_roc_obj[[3]]
+roc_obj[[1]] #gives only ROC AUC value for specific object indicated
+list_data_testing[[1]] #gives the data and obs id used to test roc_obj 1
+list_data_training[[1]] #gives the data and obs id used to train roc_obj 1
 ################################ END OF SCRIPT ###################
