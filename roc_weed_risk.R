@@ -2,7 +2,7 @@
 ## Performing ROC on data for model assessment.
 ## 
 ## DATE CREATED: 06/15/2017
-## DATE MODIFIED: 08/03/2017
+## DATE MODIFIED: 08/04/2017
 ## AUTHORS: Benoit Parmentier, Chinchu Harris 
 ## PROJECT: weed risk Chinchu Harris
 ## ISSUE: 
@@ -128,150 +128,78 @@ View(data)
 
 ###### PART 1: Use the whole dataset and set up equation and model predictions  #####
 
-#NON=non invader=0 #OTH=major invader + minor invader=1
-#67 instances of 0 #136 instances of 1
-#data=read.csv(file="firstmodelwithnewformatting.csv")
 head(data)
-#datadf <- data.frame(data)
-#class(data$invasion.status)
-#y_var <- as.factor(data[,"invasion.status"])
 
 #data$invasion.status <- as.factor(data$invasion.status)
 #y_var <- data$invasion.status
 #explanatory_variables <- names(data)[-1]
 
 y_var <- "invasion.status"
+data[[y_var]] <- as.factor(data[[y_var]])
 
 explanatory_variables <- names(data)[-1]
 
 right_side_formula <- paste(explanatory_variables,collapse = " + ")
 model_formula_str <- paste0(y_var," ~ ",right_side_formula)
 
-right_side_formula <- paste(explanatory_variables,collapse = " + ")
-model_formula_str <- paste0(y_var," ~ ",right_side_formula)
-#model_formula_str <- as.formula(paste(data$y_var, right_side_formula, sep = "~"))
 #Check the option binomial effect on predictions
-#mod <- glm(model_formula_str,data = data,family=binomial())
-#mod <- glm(model_formula_str,data = data)
+mod_glm <- glm(model_formula_str,data = data,family=binomial())
+#mod_glm <- glm(model_formula_str,data = data)
 
+breaks_val <- seq(0,1,0.1)
+
+hist(mod_glm$fitted.values,breaks=breaks_val)
+       
 ######Random Forest model##################
 
-rf_output=randomForest(x=predictor_data, 
-                       y=target, 
-                       importance = TRUE, 
-                       ntree = 10001, 
-                       proximity=TRUE, 
-                       sampsize=sampsizes)
-
-
-modrf <- predict(mod, data=data, type="prob")
-
-
-mod=randomForest(x=data[,-1], 
-                       y=data[,1], 
-                       importance = TRUE, 
-                       ntree = 10001, 
-                       proximity=TRUE, 
-                       sampsize=42)
-mod=randomForest(x=data[,-1], 
-                 y=data[,1], 
-                 importance = TRUE, 
-                 ntree = 10001, 
-                 proximity=TRUE) 
-                 #sampsize=42)
-
 #This does not work:
-set.seed(100)
-mod2=randomForest(as.formula("invasion.status ~ . "),
-                 #type="classification",
-                 data=data,
-                 importance = TRUE, 
-                 ntree = 10001, 
-                 proximity=TRUE) 
-mod2=randomForest(as.formula(model_formula_str),
-                  #type="classification",
+#set.seed(100)
+
+mod_rf <- randomForest(as.formula(model_formula_str),
+                  type="classification",
                   data=data,
                   importance = TRUE, 
                   ntree = 10001, 
                   proximity=TRUE) 
 
-iris_rf <- randomForest(Species~.,data=trainData,ntree=100,proximity=TRUE)
+#modrf <- predict(mod, data=data) #need to ask for probability otherwise the output is {0,1}
 
+predicted_rf_mat <- predict(mod, data=data, type="prob")
 
-mod <- randomForest(model_formula_str,
-                    importance=T,
-                    proximity=F,
-                    ntree=1000,
-                    type="prob",
-                    confusion=F,
-                    err.rate=F,
-                    data=data)
-
-modrf <- predict(mod, data=data, type="prob")
-
-data$invasion.status <- factor9
-data[[y_var]] <- as.factor(data[[y_var]])
-
-mod <- randomForest(formula=model_formula_str,
-                    #importance=T,
-                    #proximity=F,
-                    #ntree=1000,
-                    #confusion=F,
-                    #err.rate=F,
-                    data=data)
-
-mod <- randomForest("invasion.status ~.",
-                    importance=T,
-                    proximity=F,
-                    ntree=1000,
-                    confusion=F,
-                    err.rate=F,
-                    data=data)
-
-ind <- sample(2,nrow(iris),replace=TRUE,prob=c(0.7,0.3))
-trainData <- iris[ind==1,]
-testData <- iris[ind==2,]
-View(iris)
-#test<- predict(mod,data)
-
-rf_output=randomForest(x=predictor_data, y=target, 
-                       importance = TRUE, ntree = 10001, 
-                       proximity=TRUE, 
-                       sampsize=sampsizes)
-
-iris_rf <- randomForest(Species~.,data=trainData,ntree=100,proximity=TRUE)
-table(predict(iris_rf),trainData$Species)
-tt <- predict(iris_rf)
-tt
-mod
-class(y_var)
 #importance is set to True in order to assess the importance of the predictors (for downstream evaluations like variable importance plots)
 #proximity is set to False because we are not determining the distance of the observations to one another
 #confusion is set to False because we are using cross validation not OOB error rates to determine accuracy prediction
 #err.rate is set to False because we are using cross validation not OOB measures
-########Random Forest model end#############
-modrf <- predict(mod, data=data, type="prob")
-#mod$fitted.values #these are the probability values from ROC
-data[,y_var]
-table(data[,y_var])
+
+######## Random Forest model end#############
+
 
 mask_val <- 1:nrow(data)
 #rocd2 <- ROC(index=modrf, boolean=data[[y_var]], mask=mask_val, nthres=100)
-rocd2 <- ROC(index=modrf[,2], boolean=as.numeric(as.character(y_var)), mask=mask_val, nthres=100)
+## Select column 2 of predicted matrix of probabilities
+
+y_ref <- as.numeric(as.character(data[[y_var]])) #boolean reference values
+index_val <- predicted_rf_mat[,2] #probabilities
+rocd2_rf <- ROC(index=index_val, 
+                boolean=y_ref, 
+                mask=mask_val, nthres=100)
 
 #modrf[,1]
 #rocd2 <- ROC(index=mod$fitted.values, boolean=data[[y_var]], mask=mask_val, nthres = 100)
 
-slot(rocd2,"AUC") #this is your AUC from the logistic modeling
+slot(rocd2_rf,"AUC") #this is your AUC from the logistic modeling
 #Plot ROC curve:
-plot(rocd2)
+plot(rocd2_rf,main="Random Forest model")
 
-names(rocd2)
-str(rocd2)
+names(rocd2_rf)
+str(rocd2_rf)
+
 #Access table: 
-roc_table <- slot(rocd2,"table")
+roc_table_rf <- slot(rocd2_rf,"table")
 
-### Save plot?
+### Save ROC plot in a PNG file for glm model
+
+mod_glm$fitted.values #these are the probability values from ROC
 
 
 out_suffix_str <- paste0("full_data_",out_suffix)
@@ -287,14 +215,26 @@ png(filename=file.path(out_dir,png_file_name),
 par(mfrow=c(row_mfrow,col_mfrow))
 
 mask_val <- 1:nrow(data)
-rocd2 <- ROC(index=mod$fitted.values, 
-             boolean=data[[y_var]], mask=mask_val, nthres = 100)
+rocd2_glm <- ROC(index=mod_glm$fitted.values, 
+             boolean=y_ref, mask=mask_val, nthres = 100)
 
-slot(rocd2,"AUC") #this is your AUC from the logistic modeling
+slot(rocd2_glm,"AUC") #this is your AUC from the logistic modeling
 #Plot ROC curve:
-plot(rocd2)
+plot(rocd2_glm)
 
 dev.off()
+
+
+#### Generating plots with multiple models
+
+#Access table: 
+roc_table_rf <- slot(rocd2_rf,"table")
+#Access table: 
+roc_table_glm <- slot(rocd2_glm,"table")
+
+plot(roc_table_rf$falseAlarms1,roc_table_rf$Model1,type="b",pch=7,col="red")
+lines(roc_table_glm$falseAlarms1,roc_table_glm$Model1,type="b",pch=7,col="blue")
+title("Model comparison Random Forest and GLM")
 
 ############# PART 2: Conduct modeling with training and testing data ##############
 
@@ -327,6 +267,13 @@ list_data_testing <- sampled_data_obj$data_testing
 #lf <- run_model_fun(data_df=data,model_formula_str = model_formula_str,model_opt="logistic",data_testing=NULL,save_fig=T,out_dir=".",out_suffix="")
 #lf <- run_model_fun(data_df=data,model_formula_str = model_formula_str,model_opt="logistic",data_testing=NULL,save_fig=T,out_dir=".",out_suffix="")
 
+test <- run_model_fun(data_df=list_data_training,
+                      model_formula_str = model_formula_str,
+                      model_opt="logistic",
+                      data_testing=list_data_testing,
+                      num_cores=1,
+                      out_dir=".",
+                      out_suffix="")
 
 test <- run_model_fun(data_df=list_data_training,
                       model_formula_str = model_formula_str,
