@@ -71,21 +71,22 @@ run_model_fun <- function(data_df,model_formula_str,model_opt,data_testing=NULL,
       
     list_mod <- mclapply(1:length(data_df),
                            FUN=function(i,model_formula_str,data_df){data_input<-data_df[[i]]; 
-                           mod <-  glm(model_formula_str, data = data_input);
-                           return(mod)},
+                           mod_glm <-  glm(model_formula_str, data = data_input);
+                           return(mod_glm)},
                            model_formula_str=model_formula_str,
                            data_df=data_df,
                            mc.preschedule = FALSE,
                            mc.cores =num_cores)
-      
+      #mclapply used to return a list that is the same length as the x component (in this case x=1:length)
+      #mc.preschedule=False because there aren't large numbers of x values 
     ### Apprend prediction to training data.frame!!!
     
     if(!is.null(data_testing)){
       #
       list_predicted_val <- mclapply(1:length(data_df),
                                      FUN=function(i,list_mod,data_testing){data_v<-data_testing[[i]]; 
-                                     mod <- list_mod[[i]];
-                                     predicted_val <- predict(mod,newdata=data_v,type='response');
+                                     mod_glm <- list_mod[[i]];
+                                     predicted_val <- predict(mod_glm,newdata=data_v,type='response');
                                      return(predicted_val)},
                                      list_mod=list_mod,
                                      data_testing=data_testing,
@@ -100,11 +101,12 @@ run_model_fun <- function(data_df,model_formula_str,model_opt,data_testing=NULL,
   
   ##if(model=="RF)##
   if(model_opt=="randomForest"){
-    list_rmod <- mclapply(1:length(data_df),
-                         FUN=function(i,model_formula_str,data_df){data_input<-data_df[[i]]; 
-                         rmod <-  randomForest(as.factor(y_var)~explanatory_variables, importance=T, proximity=F, ntree=1000, confusion=F, err.rate=F data=data_input);
-                         return(rmod)},
-                         model_formula_str=model_formula_str,
+    list_mod <- mclapply(1:length(data_df),
+                         FUN=function(i, model_formula_str, data_df){data_input<-data_df[[i]]; 
+                         mod_rf <-randomForest(as.formula(model_formula_str), type = "classification",
+                                            importance=TRUE,proximity=TRUE,ntree=1000,data= data_input);
+                         return(mod_rf)},
+                         model_formula_str=as.formula(model_formula_str),
                          data_df=data_df,
                          mc.preschedule = FALSE,
                          mc.cores =num_cores)
@@ -112,11 +114,11 @@ run_model_fun <- function(data_df,model_formula_str,model_opt,data_testing=NULL,
     if(!is.null(data_testing)){
       #
       list_predicted_val <- mclapply(1:length(data_df),
-                                     FUN=function(i,list_rmod,data_testing){data_v<-data_testing[[i]]; 
-                                     rmod <- list_rmod[[i]];
-                                     predicted_val <- predict(rmod,newdata=data_v,type='response');
+                                     FUN=function(i,list_mod,data_testing){data_v<-data_testing[[i]]; 
+                                     mod_rf <- list_mod[[i]];
+                                     predicted_val <- predict(mod_rf,newdata=data_v,type='response');
                                      return(predicted_val)},
-                                     list_rmod=list_rmod,
+                                     list_mod=list_mod,
                                      data_testing=data_testing,
                                      mc.preschedule = FALSE,
                                      mc.cores =num_cores)
