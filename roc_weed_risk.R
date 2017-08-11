@@ -72,7 +72,7 @@ load_obj <- function(f){
 function_sampling <- "sampling_function_06292017b.R" #PARAM 1
 #function_modeling <- "CH07-26-2017roc_weed_risk_functions_06292017c.R" #PARAM 1 #changed this to another file
 #function_modeling <- "CH07-19-2017roc_weed_risk_functions_06292017c.R" #PARAM 1 #changed this to another file
-function_modeling <- "roc_weed_risk_functions_08112017c.R" #PARAM 1 #changed this to another file
+function_modeling <- "roc_weed_risk_functions_08112017d.R" #PARAM 1 #changed this to another file
 
 #script_path <- "/Users/chinchuharris/modeling_weed_risk/scripts" #path to script #PARAM 
 script_path <- "/nfs/bparmentier-data/Data/projects/modeling_weed_risk/scripts"
@@ -93,7 +93,7 @@ out_dir <- "/nfs/bparmentier-data/Data/projects/modeling_weed_risk/outputs"
 num_cores <- 2 #param 8 #normally I use only 1 core for this dataset but since I want to use the mclappy function the number of cores is changed to 2. If it was 1 then mclappy will be reverted back to the lapply function
 create_out_dir_param=TRUE # param 9
 
-out_suffix <-"roc_experiment_08112017" #output suffix for the files and ouptut folder #param 12
+out_suffix <-"roc_experiment_08112017d" #output suffix for the files and ouptut folder #param 12
 
 infile_data <- "publicavailableaphisdatsetforbenoit.csv"
 model_names <- c("logistic","randomForest")
@@ -283,59 +283,122 @@ list_data_testing <- sampled_data_obj$data_testing
 #paste(data_v)
 #names()
 ###### Can repeat the logistic model for each sample of training!!!
-#lf <- run_model_fun(data_df=data,model_formula_str = model_formula_str,model_opt="logistic",data_testing=NULL,save_fig=T,out_dir=".",out_suffix="")
-#lf <- run_model_fun(data_df=data,model_formula_str = model_formula_str,model_opt="logistic",data_testing=NULL,save_fig=T,out_dir=".",out_suffix="")
-
-#run in debug mode
 #debug(run_model_fun)
-#test <- run_model_fun(data_df=list_data_training[[1]],
-#                      model_formula_str = model_formula_str,
-#                      model_opt="logistic",
-#                      data_testing=list_data_testing,
-#                     num_cores=1,
-#                      out_dir=".",
-#                      out_suffix="")
+test_degugging<- run_model_fun(data_df=list_data_training,
+              model_formula_str = model_formula_str,
+              model_opt="logistic",
+              data_testing=list_data_testing,
+              num_cores=num_cores,
+              out_dir=out_dir,
+              out_suffix=out_suffix)
 
 test_glm <- run_model_fun(data_df=list_data_training,
                       model_formula_str = model_formula_str,
                       model_opt="logistic",
                       data_testing=list_data_testing,
                       num_cores=num_cores,
-                      out_dir=".",
-                      out_suffix="")
+                      out_dir=out_dir,
+                      out_suffix=out_suffix)
+
+obj_filename <- file.path(out_dir,
+                          paste0("glm_model_obj_",out_suffix,".RData"))
+save(test_glm,file=obj_filename)
+
+##access first modelg form trainng data 1
+names(test_glm) #find out what the list object contains
+
+test_glm$mod[[1]] #access model object
+test_glm$predicted_val[[1]] #access model object
+test_glm$data_training[[1]]
 
 test_random_forest <- run_model_fun(data_df=list_data_training,
                       model_formula_str = model_formula_str,
                       model_opt=model_names[2],
                       data_testing=list_data_testing,
                       num_cores= num_cores,
-                      out_dir=".",
-                      out_suffix="")
+                      out_dir=out_dir,
+                      out_suffix=out_suffix)
+
+obj_filename <- obj_filename <- file.path(out_dir,
+                                          paste0("random_forest_model_obj_",out_suffix,".RData"))
+
+save(test_random_forest,file=obj_filename)
+
+
+##access first modelg form trainng data 1
+names(test_random_forest) #find out what the list object contains
+
+test_random_forest$mod[[1]] #access model object
+test_random_forest$predicted_val[[1]] #access model object
+test_random_forest$data_training[[1]]
+
+y_ref <- as.numeric(as.character(data[[y_var]])) #boolean reference values
+index_val <- test_random_forest$predicted_val[[1]] #probabilities
+
+rocd2_rf <- ROC(index=index_val, 
+                boolean=y_ref, 
+                mask=mask_val,
+                nthres=100)
+
+slot(rocd2_rf,"AUC") #this is your AUC from the logistic modeling
+#Plot ROC curve:
+plot(rocd2_rf,
+     main=model_names[2])
+
+######## EVALUATION USING ROC ##########
+
+model_obj_filename <- "/nfs/bparmentier-data/Data/projects/modeling_weed_risk/outputs/output_roc_experiment_08112017/glm_model_obj_roc_experiment_08112017.RData"
+
+obj_glm2 <- load_obj(model_obj_filename)
+#nm <- load(model_obj_filename)
+
 
 list_predicted_val_glm <- test_glm$predicted_val
+list_predicted_val_random_forest <- test_random_forest$predicted_val
 
 #rep(data===)
 names(list_data_testing) <- paste0("data_testing_",1:length(list_data_testing)) 
 #debug(ROC_evaluation_fun)
 
-roc_obj_glm <- ROC_evaluation_fun(i=1,
+roc_obj_glm <- ROC_evaluation_fun(1,
                               list_data=list_data_testing,
                               y_var=y_var,
-                              predicted_val=list_predicted_val,
+                              predicted_val=list_predicted_val_glm,
                               save_fig=T,
                               out_suffix=out_suffix,
                               out_dir=out_dir)
 
-list_roc_obj <- lapply(1:length(list_predicted_val),
+out_suffix_s <- paste0("glm_",out_suffix)
+list_roc_obj_glm <- lapply(1:length(list_predicted_val_glm),
                        FUN=ROC_evaluation_fun,
                        list_data=list_data_testing,
                        y_var=y_var,
-                       predicted_val=list_predicted_val,
+                       predicted_val=list_predicted_val_glm,
                        save_fig=T,
-                       out_suffix=out_suffix,
+                       out_suffix=out_suffix_s,
+                       out_dir=out_dir)
+obj_filename <- file.path(out_dir,
+                          paste0("list_roc_obj_glm_",out_suffix,".RData"))
+
+save(list_roc_obj_glm,file=obj_filename)
+
+
+out_suffix_s <- paste0("random_forest_",out_suffix)
+list_roc_obj_random_forest <- lapply(1:length(list_predicted_val_random_forest),
+                       FUN=ROC_evaluation_fun,
+                       list_data=list_data_testing,
+                       y_var=y_var,
+                       predicted_val=list_predicted_val_random_forest,
+                       save_fig=T,
+                       out_suffix=out_suffix_s,
                        out_dir=out_dir)
 
-list_roc_obj[[2]] #gives ROC table values and overall ROC AUC value
+obj_filename <- file.path(out_dir,
+                          paste0("list_roc_obj_random_forest_",out_suffix,".RData"))
+
+save(list_roc_obj_random_forest,file=obj_filename)
+
+list_roc_obj_glm[[2]]$ROC_table #gives ROC table values and overall ROC AUC value
 list_roc_obj[[1]]
 list_roc_obj[[3]]
 roc_obj[[1]] #gives only ROC AUC value for specific object indicated
