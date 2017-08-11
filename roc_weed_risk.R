@@ -2,16 +2,18 @@
 ## Performing ROC on data for model assessment.
 ## 
 ## DATE CREATED: 06/15/2017
-## DATE MODIFIED: 08/04/2017
+## DATE MODIFIED: 08/11/2017
 ## AUTHORS: Benoit Parmentier, Chinchu Harris 
 ## PROJECT: weed risk Chinchu Harris
 ## ISSUE: 
 ## TO DO:
 ##
-## COMMIT:testing ROC and models of different samples for accuracy assessment
+## COMMIT: debugging error in logistic model and setting up run_logistic_fun
 ##
 ## Links to investigate:
-
+##https://stats.idre.ucla.edu/r/dae/logit-regression/
+#
+#
 ###################################################
 #
 
@@ -31,16 +33,16 @@ library(spgwr)                               # GWR method
 library(rgeos)                               # Geometric, topologic library of functions
 library(gridExtra)                           # Combining lattice plots
 library(colorRamps)                          # Palette/color ramps for symbology
-library(ggplot2)
-library(lubridate)
-library(dplyr)
-library(ROCR)
-library(pROC)
-library(TOC)
-library(randomForest) #for random forests
-library(lattice)
-library(caret) #for CV folds and data splitting
-library(gplots)
+library(ggplot2)                             # Plot package 
+library(lubridate)                           # Date utility fuctions
+library(dplyr)                               # data manipulation and wrangling
+library(ROCR)                                # ROC curve package
+library(pROC)                                # prob ROC curve
+library(TOC)                                 # TOC and ROC curve package
+library(randomForest)                        # random forests
+library(lattice)                             # Plot package
+library(caret)                               # Modeling with assessment hold outs, CV folds and data splitting
+library(gplots)                              # Plot package
 
 #
 ###### Functions used in this script and sourced from other files
@@ -68,8 +70,9 @@ load_obj <- function(f){
 ### Other functions ####
 
 function_sampling <- "sampling_function_06292017b.R" #PARAM 1
-function_modeling <- "CH07-26-2017roc_weed_risk_functions_06292017c.R" #PARAM 1 #changed this to another file
+#function_modeling <- "CH07-26-2017roc_weed_risk_functions_06292017c.R" #PARAM 1 #changed this to another file
 #function_modeling <- "CH07-19-2017roc_weed_risk_functions_06292017c.R" #PARAM 1 #changed this to another file
+function_modeling <- "roc_weed_risk_functions_08112017.R" #PARAM 1 #changed this to another file
 
 #script_path <- "/Users/chinchuharris/modeling_weed_risk/scripts" #path to script #PARAM 
 script_path <- "/nfs/bparmentier-data/Data/projects/modeling_weed_risk/scripts"
@@ -90,10 +93,10 @@ out_dir <- "/nfs/bparmentier-data/Data/projects/modeling_weed_risk/outputs"
 num_cores <- 2 #param 8 #normally I use only 1 core for this dataset but since I want to use the mclappy function the number of cores is changed to 2. If it was 1 then mclappy will be reverted back to the lapply function
 create_out_dir_param=TRUE # param 9
 
-out_suffix <-"roc_experiment_08032017" #output suffix for the files and ouptut folder #param 12
+out_suffix <-"roc_experiment_08112017" #output suffix for the files and ouptut folder #param 12
 
 infile_data <- "publicavailableaphisdatsetforbenoit.csv"
-#infile_genes_identity <- "genes_identity.csv"
+model_names <- c("logistic","randomForest")
 
 ##############################  START SCRIPT  ############################
 
@@ -135,26 +138,28 @@ head(data)
 #explanatory_variables <- names(data)[-1]
 
 y_var <- "invasion.status"
-data[[y_var]] <- as.factor(data[[y_var]])
+data[[y_var]] <- as.factor(data[[y_var]]) #this is needed for randomForest to get a classification
 
-explanatory_variables <- names(data)[-1]
+explanatory_variables <- names(data)[-1] #drop the first column
 
 right_side_formula <- paste(explanatory_variables,collapse = " + ")
 model_formula_str <- paste0(y_var," ~ ",right_side_formula)
 
 #Check the option binomial effect on predictions
 mod_glm <- glm(model_formula_str,data = data,family=binomial())
-#mod_glm <- glm(model_formula_str,data = data)
+#mod_glm2 <- glm(model_formula_str,data = data, family="binomial") #same as above
 
 breaks_val <- seq(0,1,0.1)
 
 hist(mod_glm$fitted.values,breaks=breaks_val)
-       
+barplot(table(mod_glm$fitted.values))       
+
 ######Random Forest model##################
 
 #This does not work:
 #set.seed(100)
 
+#Need to use as.formula to run model
 mod_rf <- randomForest(as.formula(model_formula_str),
                   type="classification",
                   data=data,
@@ -162,9 +167,9 @@ mod_rf <- randomForest(as.formula(model_formula_str),
                   ntree = 10001, 
                   proximity=TRUE) 
 
-#modrf <- predict(mod, data=data) #need to ask for probability otherwise the output is {0,1}
+#Predict with new or similar data, need to ask for probability otherwise the output is {0,1}
 
-predicted_rf_mat <- predict(mod, data=data, type="prob")
+predicted_rf_mat <- predict(mod_rf, data=data, type="prob")
 
 #importance is set to True in order to assess the importance of the predictors (for downstream evaluations like variable importance plots)
 #proximity is set to False because we are not determining the distance of the observations to one another
@@ -173,23 +178,22 @@ predicted_rf_mat <- predict(mod, data=data, type="prob")
 
 ######## Random Forest model end#############
 
-
 mask_val <- 1:nrow(data)
 #rocd2 <- ROC(index=modrf, boolean=data[[y_var]], mask=mask_val, nthres=100)
 ## Select column 2 of predicted matrix of probabilities
 
 y_ref <- as.numeric(as.character(data[[y_var]])) #boolean reference values
 index_val <- predicted_rf_mat[,2] #probabilities
+
 rocd2_rf <- ROC(index=index_val, 
                 boolean=y_ref, 
-                mask=mask_val, nthres=100)
-
-#modrf[,1]
-#rocd2 <- ROC(index=mod$fitted.values, boolean=data[[y_var]], mask=mask_val, nthres = 100)
+                mask=mask_val,
+                nthres=100)
 
 slot(rocd2_rf,"AUC") #this is your AUC from the logistic modeling
 #Plot ROC curve:
-plot(rocd2_rf,main="Random Forest model")
+plot(rocd2_rf,
+     main=model_names[2])
 
 names(rocd2_rf)
 str(rocd2_rf)
@@ -201,8 +205,8 @@ roc_table_rf <- slot(rocd2_rf,"table")
 
 mod_glm$fitted.values #these are the probability values from ROC
 
+out_suffix_str <- paste0("full_data_",model_name,out_suffix)
 
-out_suffix_str <- paste0("full_data_",out_suffix)
 res_pix<-480 #set as function argument...
 col_mfrow<-1
 #row_mfrow<-2
@@ -215,8 +219,12 @@ png(filename=file.path(out_dir,png_file_name),
 par(mfrow=c(row_mfrow,col_mfrow))
 
 mask_val <- 1:nrow(data)
-rocd2_glm <- ROC(index=mod_glm$fitted.values, 
-             boolean=y_ref, mask=mask_val, nthres = 100)
+index_val <- mod_glm$fitted.values
+
+rocd2_glm <- ROC(index= index_val, 
+             boolean=y_ref, 
+             mask=mask_val, 
+             nthres = 100)
 
 slot(rocd2_glm,"AUC") #this is your AUC from the logistic modeling
 #Plot ROC curve:
@@ -232,8 +240,11 @@ roc_table_rf <- slot(rocd2_rf,"table")
 #Access table: 
 roc_table_glm <- slot(rocd2_glm,"table")
 
-plot(roc_table_rf$falseAlarms1,roc_table_rf$Model1,type="b",pch=7,col="red")
-lines(roc_table_glm$falseAlarms1,roc_table_glm$Model1,type="b",pch=7,col="blue")
+plot(roc_table_rf$falseAlarms1,
+     roc_table_rf$Model1,
+     type="b",pch=24,col="red")
+
+lines(roc_table_glm$falseAlarms1,roc_table_glm$Model1,type="b",pch=24,col="blue")
 title("Model comparison Random Forest and GLM")
 
 ############# PART 2: Conduct modeling with training and testing data ##############
@@ -249,7 +260,14 @@ out_dir
 
 #sampling_training_testing(seed_number,nb_sample,step,prop_minmax,data_df,out_suffix,out_dir)
 #debug(sampling_training_testing)
-sampled_data_obj <- sampling_training_testing(data,nb_sample,step,prop_minmax,obs_id=NULL,seed_number=100,out_suffix="",out_dir=".")
+sampled_data_obj <- sampling_training_testing(data,
+                                              nb_sample,
+                                              step,
+                                              prop_minmax,
+                                              obs_id=NULL,
+                                              seed_number=100,
+                                              out_suffix="",
+                                              out_dir=".")
 
 names(sampled_data_obj)
 
@@ -267,11 +285,21 @@ list_data_testing <- sampled_data_obj$data_testing
 #lf <- run_model_fun(data_df=data,model_formula_str = model_formula_str,model_opt="logistic",data_testing=NULL,save_fig=T,out_dir=".",out_suffix="")
 #lf <- run_model_fun(data_df=data,model_formula_str = model_formula_str,model_opt="logistic",data_testing=NULL,save_fig=T,out_dir=".",out_suffix="")
 
+#run in debug mode
+#debug(run_model_fun)
+#test <- run_model_fun(data_df=list_data_training[[1]],
+#                      model_formula_str = model_formula_str,
+#                      model_opt="logistic",
+#                      data_testing=list_data_testing,
+#                     num_cores=1,
+#                      out_dir=".",
+#                      out_suffix="")
+
 test <- run_model_fun(data_df=list_data_training,
                       model_formula_str = model_formula_str,
                       model_opt="logistic",
                       data_testing=list_data_testing,
-                      num_cores=1,
+                      num_cores=num_cores,
                       out_dir=".",
                       out_suffix="")
 
@@ -311,4 +339,5 @@ list_roc_obj[[3]]
 roc_obj[[1]] #gives only ROC AUC value for specific object indicated
 list_data_testing[[1]] #gives the data and obs id used to test roc_obj 1
 list_data_training[[1]] #gives the data and obs id used to train roc_obj 1
+
 ################################ END OF SCRIPT ###################
