@@ -9,7 +9,7 @@
 ## ISSUE: 
 ## TO DO:
 ##
-## COMMIT: modifying random forest model function
+## COMMIT: prediction values for logistic and randomForest moved to separate explicit functions
 ##
 ## Links to investigate:
 ##https://stats.idre.ucla.edu/r/dae/logit-regression/
@@ -99,7 +99,7 @@ run_model_fun <- function(data_df,model_formula_str,model_opt,data_testing=NULL,
 
   if(model_opt=="logistic"){
     
-    browser()
+    #browser()
     #debug(run_logistic_fun)
     #list_mod <- run_logistic_fun(1,model_formula_str,data_df)
     
@@ -115,11 +115,18 @@ run_model_fun <- function(data_df,model_formula_str,model_opt,data_testing=NULL,
     
     if(!is.null(data_testing)){
       #
+      
+      predict_logistic_val <- function(i,list_mod,data_testing){
+        #Predictions using random forest model
+        #
+        data_v<-data_testing[[i]] 
+        mod_glm <- list_mod[[i]]
+        predicted_val <- predict(mod_glm,newdata=data_v,type='response')
+        return(predicted_val)
+      }
+      
       list_predicted_val <- mclapply(1:length(data_df),
-                                     FUN=function(i,list_mod,data_testing){data_v<-data_testing[[i]]; 
-                                     mod_glm <- list_mod[[i]];
-                                     predicted_val <- predict(mod_glm,newdata=data_v,type='response');
-                                     return(predicted_val)},
+                                     FUN=predict_logistic_val,
                                      list_mod=list_mod,
                                      data_testing=data_testing,
                                      mc.preschedule = FALSE,
@@ -131,7 +138,7 @@ run_model_fun <- function(data_df,model_formula_str,model_opt,data_testing=NULL,
       
   }
   
-  browser()
+  #browser()
   if(model_opt=="randomForest"){
 
     #debug(run_random_forest_fun)
@@ -146,13 +153,20 @@ run_model_fun <- function(data_df,model_formula_str,model_opt,data_testing=NULL,
     
     if(!is.null(data_testing)){
       #
+      
+      predict_random_forest_val <- function(i,list_mod,data_testing){
+        #Predictions using random forest model
+        #
+        data_v<-data_testing[[i]]; 
+        mod_rf <- list_mod[[i]];
+        predicted_rf_mat <- predict(mod_rf, data=data_v, type="prob");
+        #predicted_val <- predict(mod_rf,newdata=data_v,type='response');
+        predicted_val <- predicted_rf_mat[,1]
+        return(predicted_val)
+      }
+      
       list_predicted_val <- mclapply(1:length(data_df),
-                                     FUN=function(i,list_mod,data_testing){data_v<-data_testing[[i]]; 
-                                     mod_rf <- list_mod[[i]];
-                                     predicted_rf_mat <- predict(mod_rf, data=data_v, type="prob");
-                                     #predicted_val <- predict(mod_rf,newdata=data_v,type='response');
-                                     predicted_val <- predicted_rf_mat[,1]
-                                     return(predicted_val)},
+                                     FUN=predict_random_forest_val,
                                      list_mod=list_mod,
                                      data_testing=data_testing,
                                      mc.preschedule = FALSE,
