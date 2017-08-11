@@ -8,7 +8,7 @@
 ## ISSUE: 
 ## TO DO:
 ##
-## COMMIT: debugging error in logistic model and setting up run_logistic_fun
+## COMMIT: random forest function error debugging 
 ##
 ## Links to investigate:
 ##https://stats.idre.ucla.edu/r/dae/logit-regression/
@@ -72,7 +72,7 @@ load_obj <- function(f){
 function_sampling <- "sampling_function_06292017b.R" #PARAM 1
 #function_modeling <- "CH07-26-2017roc_weed_risk_functions_06292017c.R" #PARAM 1 #changed this to another file
 #function_modeling <- "CH07-19-2017roc_weed_risk_functions_06292017c.R" #PARAM 1 #changed this to another file
-function_modeling <- "roc_weed_risk_functions_08112017.R" #PARAM 1 #changed this to another file
+function_modeling <- "roc_weed_risk_functions_08112017b.R" #PARAM 1 #changed this to another file
 
 #script_path <- "/Users/chinchuharris/modeling_weed_risk/scripts" #path to script #PARAM 
 script_path <- "/nfs/bparmentier-data/Data/projects/modeling_weed_risk/scripts"
@@ -232,7 +232,6 @@ plot(rocd2_glm)
 
 dev.off()
 
-
 #### Generating plots with multiple models
 
 #Access table: 
@@ -305,11 +304,12 @@ test <- run_model_fun(data_df=list_data_training,
 
 test <- run_model_fun(data_df=list_data_training,
                       model_formula_str = model_formula_str,
-                      model_opt="randomForest",
+                      model_opt=model_names[2],
                       data_testing=list_data_testing,
-                      num_cores=1,
+                      num_cores= num_cores,
                       out_dir=".",
                       out_suffix="")
+
 list_predicted_val <- test$predicted_val
 
 #rep(data===)
