@@ -79,6 +79,28 @@ run_random_forest_fun <- function(i, model_formula_str, data_df){
   return(mod_rf)
 }
 
+predict_logistic_val <- function(i,list_mod,data_testing){
+  #Predictions using random forest model
+  #
+  data_v<-data_testing[[i]] 
+  mod_glm <- list_mod[[i]]
+  predicted_val <- predict(mod_glm,newdata=data_v,type='response')
+  return(predicted_val)
+}
+
+predict_random_forest_val <- function(i,list_mod,data_testing){
+  #Predictions using random forest model
+  #
+  data_v<-data_testing[[i]]; 
+  mod_rf <- list_mod[[i]];
+  predicted_rf_mat <- predict(mod_rf, data=data_v, type="prob");
+  #predicted_val <- predict(mod_rf,newdata=data_v,type='response');
+  predicted_val <- predicted_rf_mat[,2]
+  #index_val <- predicted_rf_mat[,2] #probabilities
+  
+  return(predicted_val)
+}
+
 run_model_fun <- function(data_df,model_formula_str,model_opt,data_testing=NULL,num_cores=1,out_dir=".",out_suffix=""){
   #data_df: input data.frame with data used in modeling
   #model_formula_str
@@ -116,15 +138,6 @@ run_model_fun <- function(data_df,model_formula_str,model_opt,data_testing=NULL,
     if(!is.null(data_testing)){
       #
       
-      predict_logistic_val <- function(i,list_mod,data_testing){
-        #Predictions using random forest model
-        #
-        data_v<-data_testing[[i]] 
-        mod_glm <- list_mod[[i]]
-        predicted_val <- predict(mod_glm,newdata=data_v,type='response')
-        return(predicted_val)
-      }
-      
       list_predicted_val <- mclapply(1:length(data_df),
                                      FUN=predict_logistic_val,
                                      list_mod=list_mod,
@@ -153,17 +166,6 @@ run_model_fun <- function(data_df,model_formula_str,model_opt,data_testing=NULL,
     
     if(!is.null(data_testing)){
       #
-      
-      predict_random_forest_val <- function(i,list_mod,data_testing){
-        #Predictions using random forest model
-        #
-        data_v<-data_testing[[i]]; 
-        mod_rf <- list_mod[[i]];
-        predicted_rf_mat <- predict(mod_rf, data=data_v, type="prob");
-        #predicted_val <- predict(mod_rf,newdata=data_v,type='response');
-        predicted_val <- predicted_rf_mat[,1]
-        return(predicted_val)
-      }
       
       list_predicted_val <- mclapply(1:length(data_df),
                                      FUN=predict_random_forest_val,
@@ -195,8 +197,13 @@ ROC_evaluation_fun <- function(i,list_data,y_var,predicted_val,save_fig=T,out_su
   #table(data_df[,y_var])
 
   mask_val <- 1:length(predicted_val[[i]])
-  rocd2 <- ROC(index=predicted_val[[i]], 
-               boolean=data_df[[y_var]], 
+  
+  ##convert factor to numeric vector for reference values
+  y_ref <- as.numeric(as.character(data_df[[y_var]])) #boolean reference values
+  index_val <- predicted_val[[i]] #probabilities
+  
+  rocd2 <- ROC(index=index_val, 
+               boolean=y_ref, 
                mask=mask_val, 
                nthres = 100)
   
@@ -209,7 +216,7 @@ ROC_evaluation_fun <- function(i,list_data,y_var,predicted_val,save_fig=T,out_su
   
   if(save_fig==TRUE){
     
-    out_suffix_str <- paste0(dataset_name,out_suffix)
+    out_suffix_str <- paste0(dataset_name,"_",out_suffix)
     
     res_pix<-480 #set as function argument...
     col_mfrow<-1
