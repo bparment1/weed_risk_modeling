@@ -9,10 +9,11 @@
 ## ISSUE: 
 ## TO DO:
 ##
-## COMMIT: adding run_logistic_fun and debugging
+## COMMIT: modifying random forest model function
 ##
 ## Links to investigate:
-
+##https://stats.idre.ucla.edu/r/dae/logit-regression/
+#
 ###################################################
 #
 
@@ -32,18 +33,51 @@ library(spgwr)                               # GWR method
 library(rgeos)                               # Geometric, topologic library of functions
 library(gridExtra)                           # Combining lattice plots
 library(colorRamps)                          # Palette/color ramps for symbology
-library(ggplot2)
-library(lubridate)
-library(dplyr)
-library(ROCR)
-library(pROC)
-library(TOC)
-library(randomForest) #for random forests
-library(lattice)
-library(caret) #for CV folds and data splitting
-library(gplots)
+library(ggplot2)                             # Plot package 
+library(lubridate)                           # Date utility fuctions
+library(dplyr)                               # data manipulation and wrangling
+library(ROCR)                                # ROC curve package
+library(pROC)                                # prob ROC curve
+library(TOC)                                 # TOC and ROC curve package
+library(randomForest)                        # random forests
+library(lattice)                             # Plot package
+library(caret)                               # Modeling with assessment hold outs, CV folds and data splitting
+library(gplots)                              # Plot package
 
 #
+run_logistic_fun <- function(i,model_formula_str,data_df){
+  #Function to run logistic model
+  #We use glm in this implementation.
+  
+  ### Begin script
+  
+  data_input<-data_df[[i]]; 
+  mod_glm <-  glm(model_formula_str, data = data_input,family=binomial());
+  
+  return(mod_glm)
+}
+
+run_random_forest_fun <- function(i, model_formula_str, data_df){
+  #Function to run random forest model
+  #We use randomForest in this implementation.
+  
+  ### Begin script
+  
+  data_input<-data_df[[i]]; 
+  
+  
+  mod_rf <- randomForest(as.formula(model_formula_str),
+                         type="classification",
+                         data=data_input,
+                         importance = TRUE, 
+                         ntree = 10001, 
+                         proximity=TRUE) 
+  
+  #Predict with new or similar data, need to ask for probability otherwise the output is {0,1}
+  #predicted_rf_mat <- predict(mod_rf, data=data, type="prob")
+  
+  return(mod_rf)
+}
 
 run_model_fun <- function(data_df,model_formula_str,model_opt,data_testing=NULL,num_cores=1,out_dir=".",out_suffix=""){
   #data_df: input data.frame with data used in modeling
@@ -65,27 +99,9 @@ run_model_fun <- function(data_df,model_formula_str,model_opt,data_testing=NULL,
 
   if(model_opt=="logistic"){
     
-    #
-    #if(class(data_df)!="list"){
-    #  list_mod <- glm(model_formula_str,data = data_df,family=binomial()) #this is the training data!!
-    #}else{
-    run_logistic_fun <- function(i,model_formula_str,data_df){
-      #Function to run logistic model
-      #We use glm in this implementation.
-      
-      ### Begin script
-      
-      data_input<-data_df[[i]]; 
-      mod_glm <-  glm(model_formula_str, data = data_input,family=binomial());
-      
-      return(mod_glm)
-    }
-    
-    #debug(run_logistic_fun)
-    
     browser()
-    
-    list_mod <- run_logistic_fun(1,model_formula_str,data_df)
+    #debug(run_logistic_fun)
+    #list_mod <- run_logistic_fun(1,model_formula_str,data_df)
     
     list_mod <- mclapply(1:length(data_df),
                            FUN=run_logistic_fun,
@@ -115,14 +131,15 @@ run_model_fun <- function(data_df,model_formula_str,model_opt,data_testing=NULL,
       
   }
   
-  ##if(model=="RF)##
+  browser()
   if(model_opt=="randomForest"){
+
+    #debug(run_random_forest_fun)
+    #list_mod <- run_random_forest_fun(1,model_formula_str,data_df)
+    
     list_mod <- mclapply(1:length(data_df),
-                         FUN=function(i, model_formula_str, data_df){data_input<-data_df[[i]]; 
-                         mod_rf <-randomForest(as.formula(model_formula_str), type = "classification",
-                                            importance=TRUE,proximity=TRUE,ntree=1000,data= data_input);
-                         return(mod_rf)},
-                         model_formula_str=as.formula(model_formula_str),
+                         FUN= run_random_forest_fun,
+                         model_formula_str=model_formula_str,
                          data_df=data_df,
                          mc.preschedule = FALSE,
                          mc.cores =num_cores)
@@ -132,7 +149,9 @@ run_model_fun <- function(data_df,model_formula_str,model_opt,data_testing=NULL,
       list_predicted_val <- mclapply(1:length(data_df),
                                      FUN=function(i,list_mod,data_testing){data_v<-data_testing[[i]]; 
                                      mod_rf <- list_mod[[i]];
-                                     predicted_val <- predict(mod_rf,newdata=data_v,type='response');
+                                     predicted_rf_mat <- predict(mod_rf, data=data_v, type="prob");
+                                     #predicted_val <- predict(mod_rf,newdata=data_v,type='response');
+                                     predicted_val <- predicted_rf_mat[,1]
                                      return(predicted_val)},
                                      list_mod=list_mod,
                                      data_testing=data_testing,
@@ -141,9 +160,10 @@ run_model_fun <- function(data_df,model_formula_str,model_opt,data_testing=NULL,
     } else{
       list_predicted_val <- NULL
     }
-    } 
+  } 
     
-  ################*bold bold *#####################
+  ####### Prepare return object 
+  
   model_obj <- list(list_mod,list_predicted_val,data_df,data_testing)
   names(model_obj) <- c("mod","predicted_val","data_training","data_testing")
   return(model_obj)
