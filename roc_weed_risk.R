@@ -8,7 +8,7 @@
 ## ISSUE: 
 ## TO DO:
 ##
-## COMMIT: random forest function error debugging 
+## COMMIT: testing predictions for logistic and random forest models with new functions 
 ##
 ## Links to investigate:
 ##https://stats.idre.ucla.edu/r/dae/logit-regression/
@@ -72,7 +72,7 @@ load_obj <- function(f){
 function_sampling <- "sampling_function_06292017b.R" #PARAM 1
 #function_modeling <- "CH07-26-2017roc_weed_risk_functions_06292017c.R" #PARAM 1 #changed this to another file
 #function_modeling <- "CH07-19-2017roc_weed_risk_functions_06292017c.R" #PARAM 1 #changed this to another file
-function_modeling <- "roc_weed_risk_functions_08112017b.R" #PARAM 1 #changed this to another file
+function_modeling <- "roc_weed_risk_functions_08112017c.R" #PARAM 1 #changed this to another file
 
 #script_path <- "/Users/chinchuharris/modeling_weed_risk/scripts" #path to script #PARAM 
 script_path <- "/nfs/bparmentier-data/Data/projects/modeling_weed_risk/scripts"
@@ -148,6 +148,7 @@ model_formula_str <- paste0(y_var," ~ ",right_side_formula)
 #Check the option binomial effect on predictions
 mod_glm <- glm(model_formula_str,data = data,family=binomial())
 #mod_glm2 <- glm(model_formula_str,data = data, family="binomial") #same as above
+predicted_val_glm <- predict(mod_glm,data=data)
 
 breaks_val <- seq(0,1,0.1)
 
@@ -205,7 +206,7 @@ roc_table_rf <- slot(rocd2_rf,"table")
 
 mod_glm$fitted.values #these are the probability values from ROC
 
-out_suffix_str <- paste0("full_data_",model_name,out_suffix)
+out_suffix_str <- paste0("full_data_",model_names[1],out_suffix)
 
 res_pix<-480 #set as function argument...
 col_mfrow<-1
@@ -241,9 +242,10 @@ roc_table_glm <- slot(rocd2_glm,"table")
 
 plot(roc_table_rf$falseAlarms1,
      roc_table_rf$Model1,
-     type="b",pch=24,col="red")
+     type="b",pch=17,col="red")
 
-lines(roc_table_glm$falseAlarms1,roc_table_glm$Model1,type="b",pch=24,col="blue")
+lines(roc_table_glm$falseAlarms1,roc_table_glm$Model1,type="b",
+      pch=17,col="blue")
 title("Model comparison Random Forest and GLM")
 
 ############# PART 2: Conduct modeling with training and testing data ##############
@@ -294,7 +296,7 @@ list_data_testing <- sampled_data_obj$data_testing
 #                      out_dir=".",
 #                      out_suffix="")
 
-test <- run_model_fun(data_df=list_data_training,
+test_glm <- run_model_fun(data_df=list_data_training,
                       model_formula_str = model_formula_str,
                       model_opt="logistic",
                       data_testing=list_data_testing,
@@ -302,7 +304,7 @@ test <- run_model_fun(data_df=list_data_training,
                       out_dir=".",
                       out_suffix="")
 
-test <- run_model_fun(data_df=list_data_training,
+test_random_forest <- run_model_fun(data_df=list_data_training,
                       model_formula_str = model_formula_str,
                       model_opt=model_names[2],
                       data_testing=list_data_testing,
@@ -310,13 +312,13 @@ test <- run_model_fun(data_df=list_data_training,
                       out_dir=".",
                       out_suffix="")
 
-list_predicted_val <- test$predicted_val
+list_predicted_val_glm <- test_glm$predicted_val
 
 #rep(data===)
 names(list_data_testing) <- paste0("data_testing_",1:length(list_data_testing)) 
 #debug(ROC_evaluation_fun)
 
-roc_obj <- ROC_evaluation_fun(i=1,
+roc_obj_glm <- ROC_evaluation_fun(i=1,
                               list_data=list_data_testing,
                               y_var=y_var,
                               predicted_val=list_predicted_val,
