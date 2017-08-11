@@ -1,14 +1,15 @@
 ############### SESYNC Research Support: weed risk ########## 
-## Performing ROC on data for model assessment.
+## Performing modeling with logistic and random forest models.
+## Model assessment is done using the ROC curve and AUC.
 ## 
 ## DATE CREATED: 06/29/2017
-## DATE MODIFIED: 06/29/2017
-## AUTHORS: Benoit Parmentier 
+## DATE MODIFIED: 08/11/2017
+## AUTHORS: Benoit Parmentier and Chinchu Harris
 ## PROJECT: weed risk Chinchu Harris
 ## ISSUE: 
 ## TO DO:
 ##
-## COMMIT:initial function script with model run function
+## COMMIT: adding run_logistic_fun and debugging
 ##
 ## Links to investigate:
 
@@ -68,17 +69,32 @@ run_model_fun <- function(data_df,model_formula_str,model_opt,data_testing=NULL,
     #if(class(data_df)!="list"){
     #  list_mod <- glm(model_formula_str,data = data_df,family=binomial()) #this is the training data!!
     #}else{
+    run_logistic_fun <- function(i,model_formula_str,data_df){
+      #Function to run logistic model
+      #We use glm in this implementation.
       
+      ### Begin script
+      
+      data_input<-data_df[[i]]; 
+      mod_glm <-  glm(model_formula_str, data = data_input,family=binomial());
+      
+      return(mod_glm)
+    }
+    
+    #debug(run_logistic_fun)
+    
+    browser()
+    
+    list_mod <- run_logistic_fun(1,model_formula_str,data_df)
+    
     list_mod <- mclapply(1:length(data_df),
-                           FUN=function(i,model_formula_str,data_df){data_input<-data_df[[i]]; 
-                           mod_glm <-  glm(model_formula_str, data = data_input);
-                           return(mod_glm)},
+                           FUN=run_logistic_fun,
                            model_formula_str=model_formula_str,
                            data_df=data_df,
                            mc.preschedule = FALSE,
                            mc.cores =num_cores)
-      #mclapply used to return a list that is the same length as the x component (in this case x=1:length)
-      #mc.preschedule=False because there aren't large numbers of x values 
+    #mclapply used to return a list that is the same length as the x component (in this case x=1:length)
+    #mc.preschedule=False because there aren't large numbers of x values 
     ### Apprend prediction to training data.frame!!!
     
     if(!is.null(data_testing)){
