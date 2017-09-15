@@ -1,6 +1,7 @@
 setwd("/Users/chinchuharris/modeling_weed_risk/data")
 
-in_<- /nfs/bparmentier-data/Data/projects/modeling_weed_risk/data
+in_dir <- "/nfs/bparmentier-data/Data/projects/modeling_weed_risk/data"
+setwd(in_dir)
 data=read.csv(file="publicavailableaphisdatsetforbenoit.csv") #data for prediction
 #MAJ = 1 Major invader 59 instances; MIN = 0 Minor invaders 35 instances
 
@@ -12,15 +13,16 @@ library(ROCR) #for diagnostics and ROC plots/stats
 library(gplots)
 library(pROC) #same as ROCR
 ###Using 43 variables specified in the firstmodel data Appendix###
-data.full<-data[,c("invasion.status", 
-                   "es1", "es2", "es3","es4", "es5","es6","es7",
-                   "es8","es9","es10","es11","es12","es13","es14",
-                   "es15","es16","es17","es18","es19","es20","es21",
-                   "es22","es23", "impg1", "impg2", "impn1", "impn2", 
-                   "impn3", "impn4", "impn5", "impn6", "impa1", "impa2",
-                   "impa3", "impa4", "impp1", "impp2", "impp3", "impp4", 
-                   "impp5", "impp6")]
+#data.full<-data[,c("invasion.status", 
+#                   "es1", "es2", "es3","es4", "es5","es6","es7",
+#                   "es8","es9","es10","es11","es12","es13","es14",
+#                   "es15","es16","es17","es18","es19","es20","es21",
+#                   "es22","es23", "impg1", "impg2", "impn1", "impn2", 
+#                   "impn3", "impn4", "impn5", "impn6", "impa1", "impa2",
+#                   "impa3", "impa4", "impp1", "impp2", "impp3", "impp4", 
+#                   "impp5", "impp6")]
 
+data.full <- data
 ###Converting DV into Factor with names for Caret Library###
 data.full$invasion.status<-factor(data.full$invasion.status, 
                                   levels=c(0,1), 
@@ -107,12 +109,18 @@ minmaj.LR.1.pred_testing_01_01 <-predict(mod_glm,
 #minmaj.RF.1.pred<-predict(minmaj.model.rf, data.full$invasion.status, type="prob")
 #minmaj.pred.LR<-prediction(minmaj.LR.1.pred$MAJ, data$invasion.status)
 
-minmaj.pred.LR.1_testing_01_01 <-prediction(minmaj.LR.1.pred_testing_01_01$PRES, 
-                             data_testing_01_01$invasion.status)
+#minmaj.pred.LR.1_testing_01_01 <-prediction(minmaj.LR.1.pred_testing_01_01$PRES, 
+#                             data_testing_01_01$invasion.status)
 
-minmaj.perf.LR<-performance(minmaj.pred.LR.1_testing_01_01, "tpr", "fpr")
+minmaj.pred.LR.1_testing_01_01 <-prediction(minmaj.LR.1.pred_testing_01_01, 
+                                            data_testing_01_01$invasion.status)
+
+minmaj.perf.LR<-performance(minmaj.pred.LR.1_testing_01_01,
+                            measure="tpr",
+                            x.measure = "fpr")
 auc.perf = performance(minmaj.pred.LR.1_testing_01_01, measure = "auc")
 
+plot
 
 par(mar = c(7.5, 9.5, 1.5, 3.5), mgp = c(5, 1, 0))
 plot(minmaj.perf.LR, 
@@ -126,7 +134,7 @@ legend(0.60, 0.20, c("Logistic Regression 0.841",
        lty = c(1,3), col = c(578,84), 
        bty="o", cex=.60)
 dev.print(tiff, "minmajpublicdata08-18-17.tiff", res=600, height=5, width=7, units="in")
-??performance
+#??performance
 
 
 
