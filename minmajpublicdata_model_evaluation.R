@@ -1,17 +1,148 @@
+############### SESYNC Research Support: weed risk ########## 
+## Checking ROC output and identification of CARET training and testing inputs/outputs
+## 
+## DATE CREATED: 08/16/2017
+## DATE MODIFIED: 09/21/2017
+## AUTHORS: Benoit Parmentier and Chinchu Harris
+## PROJECT: weed risk Chinchu Harris
+## ISSUE: 
+## TO DO:
+##
+## COMMIT:
+##
+## Links to investigate:
+
+###################################################
+#
+
+###### Library used
+
+library(gtools)                              # loading some useful tools 
+library(sp)                                  # Spatial pacakge with class definition by Bivand et al.
+library(spdep)                               # Spatial pacakge with methods and spatial stat. by Bivand et al.
+library(rgdal)                               # GDAL wrapper for R, spatial utilities
+library(gdata)                               # various tools with xls reading, cbindX
+library(rasterVis)                           # Raster plotting functions
+library(parallel)                            # Parallelization of processes with multiple cores
+library(maptools)                            # Tools and functions for sp and other spatial objects e.g. spCbind
+library(maps)                                # Tools and data for spatial/geographic objects
+library(plyr)                                # Various tools including rbind.fill
+library(spgwr)                               # GWR method
+library(rgeos)                               # Geometric, topologic library of functions
+library(gridExtra)                           # Combining lattice plots
+library(colorRamps)                          # Palette/color ramps for symbology
+library(ggplot2)
+library(lubridate)
+library(dplyr)
+library(ROCR) #for diagnostics and ROC plots/stats
+library(pROC)
+library(TOC)
+library(randomForest) #for random forests
+library(lattice)
+library(caret) #for CV folds and data splitting
+library(gplots)
+
+#
+###### Functions used in this script and sourced from other files
+
+create_dir_fun <- function(outDir,out_suffix=NULL){
+  #if out_suffix is not null then append out_suffix string
+  if(!is.null(out_suffix)){
+    out_name <- paste("output_",out_suffix,sep="")
+    outDir <- file.path(outDir,out_name)
+  }
+  #create if does not exists
+  if(!file.exists(outDir)){
+    dir.create(outDir)
+  }
+  return(outDir)
+}
+
+#Used to load RData object saved within the functions produced.
+load_obj <- function(f){
+  env <- new.env()
+  nm <- load(f, env)[1]
+  env[[nm]]
+}
+
+### Other functions ####
+
+function_sampling <- "sampling_function_06292017b.R" #PARAM 1
+#function_modeling <- "CH07-26-2017roc_weed_risk_functions_06292017c.R" #PARAM 1 #changed this to another file
+#function_modeling <- "CH07-19-2017roc_weed_risk_functions_06292017c.R" #PARAM 1 #changed this to another file
+function_modeling <- "roc_weed_risk_functions_08112017d.R" #PARAM 1 #changed this to another file
+
+#script_path <- "/Users/chinchuharris/modeling_weed_risk/scripts" #path to script #PARAM 
+script_path <- "/nfs/bparmentier-data/Data/projects/modeling_weed_risk/scripts"
+
+source(file.path(script_path,function_sampling)) #source all functions used in this script 1.
+source(file.path(script_path,function_modeling)) #source all functions used in this script 1.
+
+############################################################################
+####################  Parameters and argument set up ###########
+
+in_dir <- "/nfs/bparmentier-data/Data/projects/modeling_weed_risk/data"
+out_dir <- "/nfs/bparmentier-data/Data/projects/modeling_weed_risk/outputs"
+
+#Chinchu data
+#in_dir <- "/Users/chinchuharris/modeling_weed_risk/data" #local bpy50 , param 1
+#out_dir <- "/Users/chinchuharris/modeling_weed_risk/outputs" #param 2
+
+num_cores <- 2 #param 8 #normally I use only 1 core for this dataset but since I want to use the mclappy function the number of cores is changed to 2. If it was 1 then mclappy will be reverted back to the lapply function
+create_out_dir_param=TRUE # param 9
+
+out_suffix <-"roc_experiment_08112017d" #output suffix for the files and ouptut folder #param 12
+
+infile_data <- "publicavailableaphisdatsetforbenoit.csv"
+model_names <- c("logistic","randomForest")
+
+##############################  START SCRIPT  ############################
+
+######### PART 0: Set up the output dir ################
+
+if(is.null(out_dir)){
+  out_dir <- in_dir #output will be created in the input dir
+  
+}
+#out_dir <- in_dir #output will be created in the input dir
+
+out_suffix_s <- out_suffix #can modify name of output suffix
+if(create_out_dir_param==TRUE){
+  out_dir <- create_dir_fun(out_dir,out_suffix)
+  setwd(out_dir)
+}else{
+  setwd(out_dir) #use previoulsy defined directory
+}
+
+options(scipen=999)  #remove scientific writing
+
+
+### PART I READ AND PREPARE DATA #######
+#set up the working directory
+#Create output directory
+
+#data <- read.csv(file.path(in_dir,infile_data))
+#dim(data)
+#View(data)
+#> dim(data)
+#[1] 94 42
+
+###### PART 1: Use the whole dataset and set up equation and model predictions  #####
+
+head(data)
+
+#data$invasion.status <- as.factor(data$invasion.status)
+#y_var <- data$invasion.status
+#explanatory_variables <- names(data)[-1]
+
 setwd("/Users/chinchuharris/modeling_weed_risk/data")
 
 in_dir <- "/nfs/bparmentier-data/Data/projects/modeling_weed_risk/data"
 setwd(in_dir)
+
 data=read.csv(file="publicavailableaphisdatsetforbenoit.csv") #data for prediction
 #MAJ = 1 Major invader 59 instances; MIN = 0 Minor invaders 35 instances
 
-library(randomForest) #for random forests
-library(lattice)
-library(ggplot2)
-library(caret) #for CV folds and data splitting
-library(ROCR) #for diagnostics and ROC plots/stats
-library(gplots)
-library(pROC) #same as ROCR
 ###Using 43 variables specified in the firstmodel data Appendix###
 #data.full<-data[,c("invasion.status", 
 #                   "es1", "es2", "es3","es4", "es5","es6","es7",
@@ -172,3 +303,7 @@ Invasion.status<-as.vector(
 #transforming actual observations into vector
 separationplot(LR.1.pred$MAJ, Invasion.status, type="line", line=T, lwd2=1, show.expected=T, heading="Logistic Regression", height=1.5, col0="white", col1="black")
 separationplot(RF.1.pred$MAJ, Invasion.status, type="line", line=T, lwd2=1, show.expected=T, heading="Random Forests", height=2.5, col0="white", col1="black")
+
+
+
+##################### End of script ##############################
