@@ -2,13 +2,13 @@
 ## Checking ROC output and identification of CARET training and testing inputs/outputs
 ## 
 ## DATE CREATED: 08/16/2017
-## DATE MODIFIED: 09/21/2017
+## DATE MODIFIED: 09/25/2017
 ## AUTHORS: Benoit Parmentier and Chinchu Harris
 ## PROJECT: weed risk Chinchu Harris
 ## ISSUE: 
 ## TO DO:
 ##
-## COMMIT:
+## COMMIT:  
 ##
 ## Links to investigate:
 
@@ -91,7 +91,7 @@ out_dir <- "/nfs/bparmentier-data/Data/projects/modeling_weed_risk/outputs"
 num_cores <- 2 #param 8 #normally I use only 1 core for this dataset but since I want to use the mclappy function the number of cores is changed to 2. If it was 1 then mclappy will be reverted back to the lapply function
 create_out_dir_param=TRUE # param 9
 
-out_suffix <-"roc_experiment_08112017d" #output suffix for the files and ouptut folder #param 12
+out_suffix <-"roc_experiment_09212017" #output suffix for the files and ouptut folder #param 12
 
 infile_data <- "publicavailableaphisdatsetforbenoit.csv"
 model_names <- c("logistic","randomForest")
@@ -121,7 +121,7 @@ options(scipen=999)  #remove scientific writing
 #set up the working directory
 #Create output directory
 
-#data <- read.csv(file.path(in_dir,infile_data))
+data <- read.csv(file.path(in_dir,infile_data))
 #dim(data)
 #View(data)
 #> dim(data)
@@ -129,18 +129,18 @@ options(scipen=999)  #remove scientific writing
 
 ###### PART 1: Use the whole dataset and set up equation and model predictions  #####
 
-head(data)
+#head(data)
 
 #data$invasion.status <- as.factor(data$invasion.status)
 #y_var <- data$invasion.status
 #explanatory_variables <- names(data)[-1]
 
-setwd("/Users/chinchuharris/modeling_weed_risk/data")
+#setwd("/Users/chinchuharris/modeling_weed_risk/data")
 
-in_dir <- "/nfs/bparmentier-data/Data/projects/modeling_weed_risk/data"
-setwd(in_dir)
+#in_dir <- "/nfs/bparmentier-data/Data/projects/modeling_weed_risk/data"
+#setwd(in_dir)
 
-data=read.csv(file="publicavailableaphisdatsetforbenoit.csv") #data for prediction
+#data=read.csv(file="publicavailableaphisdatsetforbenoit.csv") #data for prediction
 #MAJ = 1 Major invader 59 instances; MIN = 0 Minor invaders 35 instances
 
 ###Using 43 variables specified in the firstmodel data Appendix###
@@ -187,7 +187,7 @@ model_formula_str <- paste0(y_var," ~ ",right_side_formula)
 
 #creates 10 CV folds for this data, summaryFunction provides a ROC summary stat in call to model#
 ###Logistic Regression Model Specification###
-minmaj.model.lr.1<-train(as.formula(model_formula_str), 
+minmaj.model.lr.1 <-train(as.formula(model_formula_str), 
                          metric="ROC", 
                          method="glm", 
                          family="binomial", 
@@ -199,7 +199,6 @@ minmaj.model.lr.1$trainingData #gives the training log saved from the returnData
 out_of_fold_predictions<-minmaj.model.lr.1$pred
 dim(out_of_fold_predictions)
 
-
 ###
 minmaj.model.lr.1$control$index #this is a list of training index row number
 
@@ -208,6 +207,7 @@ minmaj.model.lr.1$control$index #this is a list of training index row number
 #For fold 01, replication 01
 
 index_selected <- minmaj.model.lr.1$control$index$Fold01.Rep01
+index_selected <- minmaj.model.lr.1$control$index$Fold10.Rep10
 
 data_training_01_01 <- data.full[index_selected,]
 dim(data_training_01_01)
@@ -223,8 +223,6 @@ data_testing_01_01 <- data.full[index_selected_out,]
 #mod_glm2 <- glm(model_formula_str,data = data, family="binomial") #same as above
 #predicted_val_glm <- predict(mod_glm,data=data)
 
-
-library(ROCR)
 attach(data.full) #have to attach the data in order to get probabilities
 
 ###Gathering info for ROC Plots###
@@ -232,6 +230,10 @@ attach(data.full) #have to attach the data in order to get probabilities
 minmaj.LR.1.pred_testing_01_01 <-predict(mod_glm, 
                                          data_testing_01_01, 
                                          type="prob")
+
+minmaj.LR.1.pred_testing <-predict(mod_glm, 
+                                         data_testing_01_01)#, 
+                                         #type="prob")
 
 minmaj.LR.1.pred_testing_01_01 <-predict(mod_glm, 
               data_testing_01_01, 
@@ -251,8 +253,6 @@ minmaj.perf.LR<-performance(minmaj.pred.LR.1_testing_01_01,
                             x.measure = "fpr")
 auc.perf = performance(minmaj.pred.LR.1_testing_01_01, measure = "auc")
 
-plot
-
 par(mar = c(7.5, 9.5, 1.5, 3.5), mgp = c(5, 1, 0))
 plot(minmaj.perf.LR, 
      main="Logistic Regression and Random Forests", 
@@ -267,8 +267,72 @@ legend(0.60, 0.20, c("Logistic Regression 0.841",
 dev.print(tiff, "minmajpublicdata08-18-17.tiff", res=600, height=5, width=7, units="in")
 #??performance
 
+## USE TOC package ROC:
 
+#breaks_val <- seq(0,1,0.1)
 
+#hist(mod_glm$fitted.values,breaks=breaks_val)
+#barplot(table(mod_glm$fitted.values))       
+
+#mask_val <- 1:nrow(data)
+#rocd2 <- ROC(index=modrf, boolean=data[[y_var]], mask=mask_val, nthres=100)
+## Select column 2 of predicted matrix of probabilities
+
+y_ref <- as.numeric(data_testing_01_01[[y_var]]) #boolean reference values
+y_ref[y_ref==2]<- 1
+y_ref[y_ref==1]<- 0
+
+index_val <- minmaj.LR.1.pred_testing
+
+mask_val <- rep(1,length=length(index_val))
+rocd2_rf <- ROC(index=index_val, 
+                boolean=y_ref, 
+                mask=mask_val,
+                nthres=100)
+
+slot(rocd2_rf,"AUC") #this is your AUC from the logistic modeling
+#Plot ROC curve:
+plot(rocd2_rf,
+     main=model_names[2])
+
+names(rocd2_rf)
+str(rocd2_rf)
+
+#Access table: 
+roc_table_rf <- slot(rocd2_rf,"table")
+
+### Save ROC plot in a PNG file for glm model
+
+mod_glm$fitted.values #these are the probability values from ROC
+
+out_suffix_str <- paste0("full_data_",model_names[1],out_suffix)
+
+res_pix<-480 #set as function argument...
+col_mfrow<-1
+#row_mfrow<-2
+row_mfrow<-1
+
+png_file_name<- paste("Figure_","ROC_plot_",out_suffix_str,".png", sep="")
+
+png(filename=file.path(out_dir,png_file_name),
+    width=col_mfrow*res_pix,height=row_mfrow*res_pix)
+par(mfrow=c(row_mfrow,col_mfrow))
+
+mask_val <- 1:nrow(data)
+index_val <- mod_glm$fitted.values
+
+rocd2_glm <- ROC(index= index_val, 
+                 boolean=y_ref, 
+                 mask=mask_val, 
+                 nthres = 100)
+
+slot(rocd2_glm,"AUC") #this is your AUC from the logistic modeling
+#Plot ROC curve:
+plot(rocd2_glm)
+
+dev.off()
+
+###
 out_of_fold_predictions #gives the prediction values for the glm model 
 summary(minmaj.model.lr.1) #provides coefficients & traditional R model output
 minmaj.model.lr.1 #provides CV summary stats #keep in mind caret takes minmaj class (here the minmaj class is O) ##Generalized Linear Model 
@@ -288,8 +352,6 @@ minmaj.rf_out_of_fold_predictions<-minmaj.model.rf$pred
 minmaj.rf_out_of_fold_predictions #gives the prediction values for the rf model
 minmaj.model.rf
 confusionMatrix(minmaj.model.rf, norm="average")
-
-
 
 ###Separation Plots###
 library(separationplot)
