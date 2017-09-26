@@ -2,7 +2,7 @@
 ## Checking ROC output and identification of CARET training and testing inputs/outputs
 ## 
 ## DATE CREATED: 08/16/2017
-## DATE MODIFIED: 09/25/2017
+## DATE MODIFIED: 09/26/2017
 ## AUTHORS: Benoit Parmentier and Chinchu Harris
 ## PROJECT: weed risk Chinchu Harris
 ## ISSUE: 
@@ -91,7 +91,7 @@ out_dir <- "/nfs/bparmentier-data/Data/projects/modeling_weed_risk/outputs"
 num_cores <- 2 #param 8 #normally I use only 1 core for this dataset but since I want to use the mclappy function the number of cores is changed to 2. If it was 1 then mclappy will be reverted back to the lapply function
 create_out_dir_param=TRUE # param 9
 
-out_suffix <-"roc_experiment_09212017" #output suffix for the files and ouptut folder #param 12
+out_suffix <-"roc_experiment_09262017" #output suffix for the files and ouptut folder #param 12
 
 infile_data <- "publicavailableaphisdatsetforbenoit.csv"
 model_names <- c("logistic","randomForest")
@@ -199,7 +199,7 @@ minmaj.model.lr.1$trainingData #gives the training log saved from the returnData
 out_of_fold_predictions<-minmaj.model.lr.1$pred
 dim(out_of_fold_predictions)
 
-###
+### Training
 minmaj.model.lr.1$control$index #this is a list of training index row number
 
 ##### Let's selected each training dataset used in 10 folds, replication 10
@@ -217,6 +217,7 @@ mod_glm <- glm(model_formula_str,
                data = data_training_01_01,
                family="binomial")
 
+## Testing
 index_selected_out <- minmaj.model.lr.1$control$indexOut$Resample001
 data_testing_01_01 <- data.full[index_selected_out,]
 
@@ -227,14 +228,7 @@ attach(data.full) #have to attach the data in order to get probabilities
 
 ###Gathering info for ROC Plots###
 #get porbability of prediction
-minmaj.LR.1.pred_testing_01_01 <-predict(mod_glm, 
-                                         data_testing_01_01, 
-                                         type="prob")
-
-minmaj.LR.1.pred_testing <-predict(mod_glm, 
-                                         data_testing_01_01)#, 
-                                         #type="prob")
-
+### Need response to get predicted prob
 minmaj.LR.1.pred_testing_01_01 <-predict(mod_glm, 
               data_testing_01_01, 
               type="response")
@@ -245,8 +239,28 @@ minmaj.LR.1.pred_testing_01_01 <-predict(mod_glm,
 #minmaj.pred.LR.1_testing_01_01 <-prediction(minmaj.LR.1.pred_testing_01_01$PRES, 
 #                             data_testing_01_01$invasion.status)
 
+
+################ RUN ROC analysis
+
+y_ref <- as.numeric(data_testing_01_01[[y_var]]) #boolean reference values
+x<- y_ref
+y_ref[x==2]<- 1
+y_ref[x==1]<- 0
+
 minmaj.pred.LR.1_testing_01_01 <-prediction(minmaj.LR.1.pred_testing_01_01, 
                                             data_testing_01_01$invasion.status)
+### This is the issue why we have an inverted ROC plot
+minmaj.pred.LR.1_testing_01_01 <-prediction(minmaj.LR.1.pred_testing_01_01, 
+                                            y_ref)
+
+#Documention: If the labels are factors (unordered), numeric, logical or characters, ordering of the labels is inferred from R's built-in < relation (e.g. 0 < 1, -1 < 1, 'a' < 'b', FALSE < TRUE). Use label.ordering to override this default ordering. “
+#This means that the ordering was reversed (because of it takes the default alphabetical order) so 
+#that the reference variable was reversed hence the ROC curve is reversed.
+
+minmaj.pred.LR.1_testing_01_01 <-prediction(minmaj.LR.1.pred_testing_01_01, 
+                                            data_testing_01_01$invasion.status,
+                                            label.ordering=c("MIN","MAJ"))
+### This is the issue why we have an inverted ROC plot
 
 minmaj.perf.LR<-performance(minmaj.pred.LR.1_testing_01_01,
                             measure="tpr",
@@ -279,10 +293,12 @@ dev.print(tiff, "minmajpublicdata08-18-17.tiff", res=600, height=5, width=7, uni
 ## Select column 2 of predicted matrix of probabilities
 
 y_ref <- as.numeric(data_testing_01_01[[y_var]]) #boolean reference values
-y_ref[y_ref==2]<- 1
-y_ref[y_ref==1]<- 0
+x<- y_ref
+y_ref[x==2]<- 1
+y_ref[x==1]<- 0
 
-index_val <- minmaj.LR.1.pred_testing
+#index_val <- minmaj.LR.1.pred_testing
+index_val <- minmaj.LR.1.pred_testing_01_01
 
 mask_val <- rep(1,length=length(index_val))
 rocd2_rf <- ROC(index=index_val, 
