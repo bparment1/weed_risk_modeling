@@ -199,156 +199,226 @@ minmaj.model.lr.1$trainingData #gives the training log saved from the returnData
 out_of_fold_predictions<-minmaj.model.lr.1$pred
 dim(out_of_fold_predictions)
 
-### Training
-minmaj.model.lr.1$control$index #this is a list of training index row number
+table(out_of_fold_predictions<-minmaj.model.lr.1$pred$Resample)
+#there are 10 folds wich each of them repeated 10 times: e.g. Fold01.Rep01,Fold01.Rep02,Fold01.Rep03...
+#For each fold-repetition combianation, there between 8-10 samples taken from the original data.frame.
 
+### Training
+minmaj.model.lr.1$control$index #this is a list of training index row number, taken from the original data.frame to fit model.
+
+################
 ##### Let's selected each training dataset used in 10 folds, replication 10
 
 #For fold 01, replication 01
 
-index_selected <- minmaj.model.lr.1$control$index$Fold01.Rep01
-index_selected <- minmaj.model.lr.1$control$index$Fold10.Rep10
+model_obj <- minmaj.model.lr.1
+data_input <- data.full
 
-data_training_01_01 <- data.full[index_selected,]
-dim(data_training_01_01)
+compute_training_testing_ROC_AUC <- function(i,y_var,model_formula_str,model_obj,data_input,model_opt=c("glm")){
+  #
+  #Function to predict training and testing from caret input
+  #
+  #Inputs:
+  #1) i : seletected testing or training item
+  #2) model_obj: This is the caret model object.
+  
+  ################
+  
+  ### Begin ##
+  
+  # Part 1: training first
+  index_selected_training <- model_obj$control$index[[i]]
 
-#Check the option binomial effect on predictions
-mod_glm <- glm(model_formula_str,
-               data = data_training_01_01,
-               family="binomial")
+  name_sample <- names(model_obj$control$index)[i]
+  n_sample_training <- length(index_selected_training)
+  
+  data_training <- data_input[index_selected_training,]
+  #dim(data_training)
+  
+  if(model_opt=="glm"){
+    #Check the option binomial effect on predictions
+    mod <- glm(model_formula_str,
+                   data = data_training,
+                   family="binomial")
+  }
 
-## Testing
-index_selected_out <- minmaj.model.lr.1$control$indexOut$Resample001
-data_testing_01_01 <- data.full[index_selected_out,]
+  ## Testing
+  index_selected_testing <- minmaj.model.lr.1$control$indexOut$Resample001
 
-#mod_glm2 <- glm(model_formula_str,data = data, family="binomial") #same as above
-#predicted_val_glm <- predict(mod_glm,data=data)
+  data_testing_01_01 <- data.full[index_selected_out,]
+  
+  index_selected_testing <- model_obj$control$indexOut[[i]]
+  data_testing <- data_training[index_selected_testing,]
+  
+  #mod_glm2 <- glm(model_formula_str,data = data, family="binomial") #same as above
+  #predicted_val_glm <- predict(mod_glm,data=data)
+  
+  #attach(data.full) #have to attach the data in order to get probabilities
+  
+  ###Gathering info for ROC Plots###
+  
+  #get porbability of prediction
+  ### Need response to get predicted prob
+  #minmaj.LR.1.pred_testing_01_01 <-predict(mod_glm, 
+  #                                         data_testing, 
+  #                                         type="response")
+  
+  if(model_opt=="glm"){
+    prediction_testing <-predict(mod, 
+                                 data_testing, 
+                                 type="response")
+  }
+  
+  #minmaj.RF.1.pred<-predict(minmaj.model.rf, data.full$invasion.status, type="prob")
+  #minmaj.pred.LR<-prediction(minmaj.LR.1.pred$MAJ, data$invasion.status)
+  
+  #minmaj.pred.LR.1_testing_01_01 <-prediction(minmaj.LR.1.pred_testing_01_01$PRES, 
+  #                             data_testing_01_01$invasion.status)
+  
+  ################ RUN ROC analysis  #####
+  
+  ## First use ROCR ###
+  
+  y_ref <- as.numeric(data_testing[[y_var]]) #boolean reference values
+  x<- y_ref
+  y_ref[x==2]<- 1
+  y_ref[x==1]<- 0
+  
+  #minmaj.pred.LR.1_testing_01_01 <-prediction(minmaj.LR.1.pred_testing_01_01, 
+  #                                            data_testing_01_01$invasion.status)
+  #ROCR_prediction <-prediction(prediction_testing, 
+  #                                            data_testing[[y_var]])
+  
+  ### This is the issue why we have an inverted ROC plot
+  #minmaj.pred.LR.1_testing_01_01 <-prediction(minmaj.LR.1.pred_testing_01_01, 
+  #                                            y_ref)
+  ROCR_prediction_obj <-prediction(prediction_testing,  
+                                              y_ref)
+  
+  #Documention: If the labels are factors (unordered), numeric, logical or characters, ordering of the labels is inferred from R's built-in < relation (e.g. 0 < 1, -1 < 1, 'a' < 'b', FALSE < TRUE). Use label.ordering to override this default ordering. “
+  #This means that the ordering was reversed (because of it takes the default alphabetical order) so 
+  #that the reference variable was reversed hence the ROC curve is reversed.
+  
+  #minmaj.pred.LR.1_testing_01_01 <-prediction(minmaj.LR.1.pred_testing_01_01, 
+  #                                            data_testing_01_01$invasion.status,
+  #                                            label.ordering=c("MIN","MAJ"))
+  
+  ### This is the issue why we have an inverted ROC plot
+  
+  ROCR_performance <-performance(ROCR_prediction_obj,
+                              measure="tpr",
+                              x.measure = "fpr")
+  
+  #minmaj.perf.LR <- performance(minmaj.pred.LR.1_testing_01_01,
+  #                            measure="tpr",
+  #                            x.measure = "fpr")
+  
+  #auc.perf = performance(minmaj.pred.LR.1_testing_01_01, measure = "auc")
+  auc.perf = performance(ROCR_prediction_obj, measure = "auc")
+  
+  par(mar = c(7.5, 9.5, 1.5, 3.5), mgp = c(5, 1, 0))
+  plot(minmaj.perf.LR, 
+       main="Logistic Regression and Random Forests", 
+       lty=1, col=578)
+  
+  plot(ROCR_performance, 
+       main="Logistic Regression and Random Forests", 
+       lty=1, col=578)
+  
+  #plot(minmaj.perf.RF.1, xlab = "False Positive Rate", 
+  #     ylab = "True Positive Rate", 
+  #     add=T, lty=3, col=84)
+  legend(0.60, 0.20, c("Logistic Regression 0.841", 
+                       "Random Forest  0.948"), 
+         lty = c(1,3), col = c(578,84), 
+         bty="o", cex=.60)
+  dev.print(tiff, "minmajpublicdata08-18-17.tiff", res=600, height=5, width=7, units="in")
+  
+  #??performance
+  
+  ## USE TOC package ROC:
+  
+  #breaks_val <- seq(0,1,0.1)
+  
+  #hist(mod_glm$fitted.values,breaks=breaks_val)
+  #barplot(table(mod_glm$fitted.values))       
+  
+  #mask_val <- 1:nrow(data)
+  #rocd2 <- ROC(index=modrf, boolean=data[[y_var]], mask=mask_val, nthres=100)
+  ## Select column 2 of predicted matrix of probabilities
+  
+  ############### Using TOC package in R ############
+  
+  y_ref <- as.numeric(data_testing[[y_var]]) #boolean reference values
+  x<- y_ref
+  y_ref[x==2]<- 1
+  y_ref[x==1]<- 0
+  
+  #index_val <- minmaj.LR.1.pred_testing
+  #index_val <- minmaj.LR.1.pred_testing_01_01 
+  index_val <- prediction_testing
+  
+  mask_val <- rep(1,length=length(index_val))
+  rocd2_rf <- ROC(index=index_val, 
+                  boolean=y_ref, 
+                  mask=mask_val,
+                  nthres=100
+                 )
+  
+  slot(rocd2_rf,"AUC") #this is your AUC from the logistic modeling
+  #Plot ROC curve:
+  plot(rocd2_rf,
+       main=model_names[2])
+       
+  
+  names(rocd2_rf)
+  str(rocd2_rf)
+  
+  #Access table: 
+  roc_table_rf <- slot(rocd2_rf,"table")
+  
+  ### Save ROC plot in a PNG file for glm model
+  
+  mod$fitted.values #these are the probability values from ROC
+  
+  out_suffix_str <- paste0("data_","testing_",model_names[1],out_suffix)
+  
+  res_pix<-480 #set as function argument...
+  col_mfrow<-1
+  #row_mfrow<-2
+  row_mfrow<-1
+  
+  png_file_name<- paste("Figure_","ROC_plot_",out_suffix_str,".png", sep="")
+  
+  png(filename=file.path(out_dir,png_file_name),
+      width=col_mfrow*res_pix,height=row_mfrow*res_pix)
+  par(mfrow=c(row_mfrow,col_mfrow))
+  
+  mask_val <- 1:nrow(data)
+  index_val <- mod_glm$fitted.values
+  
+  rocd2_glm <- ROC(index= index_val, 
+                   boolean=y_ref, 
+                   mask=mask_val, 
+                   nthres = 100)
+  
+  slot(rocd2_glm,"AUC") #this is your AUC from the logistic modeling
+  #Plot ROC curve:
+  plot(rocd2_glm)
+  
+  dev.off()
+  
+  ##### 
+  #AUC_ROCR, AUC TOC, fig val, AUC table
+  #
+  
+  return()
+}
 
-attach(data.full) #have to attach the data in order to get probabilities
+########################################
+######## Importance of variables input
 
-###Gathering info for ROC Plots###
-#get porbability of prediction
-### Need response to get predicted prob
-minmaj.LR.1.pred_testing_01_01 <-predict(mod_glm, 
-              data_testing_01_01, 
-              type="response")
-
-#minmaj.RF.1.pred<-predict(minmaj.model.rf, data.full$invasion.status, type="prob")
-#minmaj.pred.LR<-prediction(minmaj.LR.1.pred$MAJ, data$invasion.status)
-
-#minmaj.pred.LR.1_testing_01_01 <-prediction(minmaj.LR.1.pred_testing_01_01$PRES, 
-#                             data_testing_01_01$invasion.status)
-
-
-################ RUN ROC analysis
-
-y_ref <- as.numeric(data_testing_01_01[[y_var]]) #boolean reference values
-x<- y_ref
-y_ref[x==2]<- 1
-y_ref[x==1]<- 0
-
-minmaj.pred.LR.1_testing_01_01 <-prediction(minmaj.LR.1.pred_testing_01_01, 
-                                            data_testing_01_01$invasion.status)
-### This is the issue why we have an inverted ROC plot
-minmaj.pred.LR.1_testing_01_01 <-prediction(minmaj.LR.1.pred_testing_01_01, 
-                                            y_ref)
-
-#Documention: If the labels are factors (unordered), numeric, logical or characters, ordering of the labels is inferred from R's built-in < relation (e.g. 0 < 1, -1 < 1, 'a' < 'b', FALSE < TRUE). Use label.ordering to override this default ordering. “
-#This means that the ordering was reversed (because of it takes the default alphabetical order) so 
-#that the reference variable was reversed hence the ROC curve is reversed.
-
-minmaj.pred.LR.1_testing_01_01 <-prediction(minmaj.LR.1.pred_testing_01_01, 
-                                            data_testing_01_01$invasion.status,
-                                            label.ordering=c("MIN","MAJ"))
-### This is the issue why we have an inverted ROC plot
-
-minmaj.perf.LR<-performance(minmaj.pred.LR.1_testing_01_01,
-                            measure="tpr",
-                            x.measure = "fpr")
-auc.perf = performance(minmaj.pred.LR.1_testing_01_01, measure = "auc")
-
-par(mar = c(7.5, 9.5, 1.5, 3.5), mgp = c(5, 1, 0))
-plot(minmaj.perf.LR, 
-     main="Logistic Regression and Random Forests", 
-     lty=1, col=578)
-#plot(minmaj.perf.RF.1, xlab = "False Positive Rate", 
-#     ylab = "True Positive Rate", 
-#     add=T, lty=3, col=84)
-legend(0.60, 0.20, c("Logistic Regression 0.841", 
-                     "Random Forest  0.948"), 
-       lty = c(1,3), col = c(578,84), 
-       bty="o", cex=.60)
-dev.print(tiff, "minmajpublicdata08-18-17.tiff", res=600, height=5, width=7, units="in")
-#??performance
-
-## USE TOC package ROC:
-
-#breaks_val <- seq(0,1,0.1)
-
-#hist(mod_glm$fitted.values,breaks=breaks_val)
-#barplot(table(mod_glm$fitted.values))       
-
-#mask_val <- 1:nrow(data)
-#rocd2 <- ROC(index=modrf, boolean=data[[y_var]], mask=mask_val, nthres=100)
-## Select column 2 of predicted matrix of probabilities
-
-y_ref <- as.numeric(data_testing_01_01[[y_var]]) #boolean reference values
-x<- y_ref
-y_ref[x==2]<- 1
-y_ref[x==1]<- 0
-
-#index_val <- minmaj.LR.1.pred_testing
-index_val <- minmaj.LR.1.pred_testing_01_01
-
-mask_val <- rep(1,length=length(index_val))
-rocd2_rf <- ROC(index=index_val, 
-                boolean=y_ref, 
-                mask=mask_val,
-                nthres=100)
-
-slot(rocd2_rf,"AUC") #this is your AUC from the logistic modeling
-#Plot ROC curve:
-plot(rocd2_rf,
-     main=model_names[2])
-
-names(rocd2_rf)
-str(rocd2_rf)
-
-#Access table: 
-roc_table_rf <- slot(rocd2_rf,"table")
-
-### Save ROC plot in a PNG file for glm model
-
-mod_glm$fitted.values #these are the probability values from ROC
-
-out_suffix_str <- paste0("full_data_",model_names[1],out_suffix)
-
-res_pix<-480 #set as function argument...
-col_mfrow<-1
-#row_mfrow<-2
-row_mfrow<-1
-
-png_file_name<- paste("Figure_","ROC_plot_",out_suffix_str,".png", sep="")
-
-png(filename=file.path(out_dir,png_file_name),
-    width=col_mfrow*res_pix,height=row_mfrow*res_pix)
-par(mfrow=c(row_mfrow,col_mfrow))
-
-mask_val <- 1:nrow(data)
-index_val <- mod_glm$fitted.values
-
-rocd2_glm <- ROC(index= index_val, 
-                 boolean=y_ref, 
-                 mask=mask_val, 
-                 nthres = 100)
-
-slot(rocd2_glm,"AUC") #this is your AUC from the logistic modeling
-#Plot ROC curve:
-plot(rocd2_glm)
-
-dev.off()
-
-###
+## Using library separation plot
 out_of_fold_predictions #gives the prediction values for the glm model 
 summary(minmaj.model.lr.1) #provides coefficients & traditional R model output
 minmaj.model.lr.1 #provides CV summary stats #keep in mind caret takes minmaj class (here the minmaj class is O) ##Generalized Linear Model 
